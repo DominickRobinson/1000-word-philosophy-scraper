@@ -1,0 +1,17 @@
+node_modules/
+dist/
+.build/
+.DS_Store
+*.p12
+*.pfx
+*.mobileprovision
+*.provisionprofile
+*.keystore
+.env
+.env.*
+!.env.example
+*.log
+test-results/
+playwright-report/
+__pycache__/
+*.pyc

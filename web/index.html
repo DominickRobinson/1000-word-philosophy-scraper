@@ -1,0 +1,8 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' https://1000wordphilosophy.com https://www.1000wordphilosophy.com https://i0.wp.com https://i1.wp.com https://i2.wp.com https://1000wordphilosophy.files.wordpress.com; object-src 'none'; frame-src 'none'"><title>1000 Word Philosophy Scraper</title><link rel="stylesheet" href="style.css"></head>
+<body><main>
+<header><h1>1000 Word Philosophy</h1><p>Scraper</p></header>
+<section class="destination"><div class="label">SAVE TO</div><p id="folderName">No folder selected</p><button id="chooseFolder">Choose folder</button></section>
+<section class="download"><button class="primary" id="download">Download new articles</button><div class="progress-track" role="progressbar" aria-label="Download progress" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"><div id="progressFill"></div></div><div class="progress-label"><span id="status">Choose a folder to begin.</span><span id="count"></span></div><p id="detail"></p></section>
+<details id="errors" hidden><summary id="errorCount">Download details</summary><pre id="log"></pre></details>
+</main><script src="core.js"></script><script src="api.js"></script><script src="browser.js"></script><script src="app.js"></script></body></html>
