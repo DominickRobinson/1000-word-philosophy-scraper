@@ -1,6 +1,6 @@
 /* GitHub Pages adapter: source API -> local folder, with a portable ZIP fallback. */
 (function(){'use strict';
-  if(window.Android||(window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.bridge)||window.testNative)return;
+  if(window.testNative)return;
   const allowed=new Set(['1000wordphilosophy.com','www.1000wordphilosophy.com','i0.wp.com','i1.wp.com','i2.wp.com','1000wordphilosophy.files.wordpress.com']);
   let directory=null,imports=new Map(),writes=new Map(),label=null,mode=null,wake=null,lastRequest=0,chain=Promise.resolve();
   const cache=new Map();

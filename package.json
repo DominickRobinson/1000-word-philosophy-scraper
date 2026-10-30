@@ -5,11 +5,9 @@
   "description": "A minimal offline EPUB library builder for 1000-Word Philosophy.",
   "scripts": {
     "test": "node tests/check.cjs",
-    "build:web": "python3 scripts/build_web.py",
-    "build:android": "python3 build.py android"
+    "build:web": "python3 scripts/build_web.py"
   },
   "devDependencies": {
     "playwright": "1.64.1"
-  },
-  "androidVersionCode": 5
+  }
 }

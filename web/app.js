@@ -1,17 +1,8 @@
 (function(){'use strict';
-  const P=window.Philosophy,$=id=>document.getElementById(id),pending=new Map();let sequence=0;
-  window.nativeResult=function(id,result,error){const p=pending.get(id);if(!p)return;clearTimeout(p.timer);pending.delete(id);error?p.reject(new Error(error)):p.resolve(result);};
+  const P=window.Philosophy,$=id=>document.getElementById(id);
   function native(action,args){
-    if(window.testNative)return window.testNative(action,args||{});
-    if(window.browserNative)return window.browserNative(action,args||{});
-    return new Promise((resolve,reject)=>{
-      const id=++sequence,message=JSON.stringify({id:id,action:action,args:args||{}});
-      const timer=setTimeout(()=>{pending.delete(id);reject(new Error('The operation timed out. Please try again.'));},180000);
-      pending.set(id,{resolve:resolve,reject:reject,timer:timer});
-      if(window.Android)window.Android.postMessage(message);
-      else if(window.webkit&&window.webkit.messageHandlers.bridge)window.webkit.messageHandlers.bridge.postMessage(message);
-      else{clearTimeout(timer);pending.delete(id);reject(new Error('Open the installed app to save files.'));}
-    });
+    const adapter=window.testNative||window.browserNative;
+    return adapter?adapter(action,args||{}):Promise.reject(new Error('The browser file adapter did not load. Reload the page.'));
   }
   const state={folder:null,articles:[],ledger:P.readLedger(''),files:[],busy:false,stop:false,exportPending:false,errors:[],blocked:[]};
   function showError(message){state.errors.push(message);$('log').textContent=state.errors.join('\n');$('errorCount').textContent='Download details ('+state.errors.length+')';$('errors').hidden=false;}
