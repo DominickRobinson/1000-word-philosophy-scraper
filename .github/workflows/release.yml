@@ -66,18 +66,8 @@ jobs:
         with:
           name: release-android
           path: dist/1000-Word-Philosophy-Android.apk
-  web:
-    needs: test
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v7.0.1
-      - run: python3 scripts/build_web.py
-      - uses: actions/upload-artifact@v7.0.2
-        with:
-          name: release-web
-          path: dist/1000-Word-Philosophy-Web.zip
   publish:
-    needs: [mac, android, web]
+    needs: [mac, android]
     runs-on: ubuntu-24.04
     permissions:
       contents: write

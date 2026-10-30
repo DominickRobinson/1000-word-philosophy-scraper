@@ -57,7 +57,7 @@ A native iOS build is deferred. The browser ZIP workflow is available on iOS.
 
 - **CI:** browser/controller tests plus native Mac and Android compilation on pushes and pull requests. CI Android artifacts use a temporary development key.
 - **GitHub Pages:** deploys after successful CI, on manual dispatch, and daily to refresh the site's policy snapshot.
-- **Release:** pushing a `v*` tag runs tests, builds Mac/Android/web packages, creates checksums and publishes a GitHub release.
+- **Release:** pushing a `v*` tag runs tests, builds Mac/Android packages, creates checksums and publishes a GitHub release.
 
 Release Android builds use encrypted repository secrets `ANDROID_KEYSTORE_BASE64` and `ANDROID_KEYSTORE_PASSWORD`. These contain the original app signing identity so updates remain compatible. Private keys and passwords must never be committed. Without these secrets, release signing fails rather than silently using a new identity.
 

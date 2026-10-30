@@ -9,3 +9,5 @@ The app preserves article images, headings, notes, references and appendices. Ci
 Windows and Linux use the web app. A native iOS app is deferred; iOS browsers can use ZIP export. Physical Supernote testing is still needed.
 
 Builds use automated synthetic tests; no copyrighted essay collection is included in these release assets. Checksums are in `SHA256SUMS.txt`.
+
+Attached downloads are the Android APK and a ZIP containing the Mac `.app` bundle, plus checksums. Use the hosted website for the web version. GitHub also displays its own automatically generated source archives.
