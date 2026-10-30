@@ -1,5 +1,6 @@
 Download the Android APK below, or [open the web app](https://www.dominick.fyi/1000-word-philosophy-scraper/).
 
+- Avoid stale source API cache responses that lack browser access headers.
 - Read the All Essays directory and resolve its old links to current article URLs. This fixes Hell and Universalism.
 - Cap embedded images at 1,600 pixels on the longest edge without enlarging small images, and request resized images from the site when available. If an image fails, save the essay without it and record the warning.
 - Recognize explicit unavailable notices, such as The Problem of Induction, and recheck when the source changes.

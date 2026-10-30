@@ -59,7 +59,14 @@
     const delay=1000-(Date.now()-lastRequest);if(delay>0)await new Promise(r=>setTimeout(r,delay));lastRequest=Date.now();
     const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),50000);
     try{
-      const response=await fetch(args.url,{credentials:'omit',mode:'cors',redirect:'error',signal:controller.signal,cache:args.fresh?'no-store':'default'});
+      // WordPress/CDN caches can retain responses fetched without an Origin header.
+      // Separate browser-origin variants and bypass that shared cache for fresh API reads.
+      const requestURL=new URL(args.url);
+      if(requestURL.hostname==='1000wordphilosophy.com'&&requestURL.pathname.startsWith('/wp-json/')){
+        requestURL.searchParams.set('_scraper_origin',location.origin);
+        if(args.fresh)requestURL.searchParams.set('_scraper_refresh',Date.now().toString());
+      }
+      const response=await fetch(requestURL.href,{credentials:'omit',mode:'cors',redirect:'error',signal:controller.signal,cache:args.fresh?'no-store':'default'});
       if(!response.ok)return {status:response.status};
       const data=new Uint8Array(await response.arrayBuffer());if(data.length>20000000)throw new Error('The source file exceeds 20 MB.');
       const result={status:response.status,url:response.url,text:args.binary?'':new TextDecoder().decode(data),base64:args.binary?encode(data):''};
