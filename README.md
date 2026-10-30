@@ -2,7 +2,7 @@
 
 A small, e-ink-friendly tool with two buttons: **Choose folder** and **Download new articles**.
 
-**[Open the web app](https://dominickrobinson.github.io/1000-word-philosophy-scraper/)** · **[Download Android or Mac](https://github.com/DominickRobinson/1000-word-philosophy-scraper/releases/latest)**
+**[Open the web app](https://dominickrobinson.github.io/1000-word-philosophy-scraper/)** · **[Download Android](https://github.com/DominickRobinson/1000-word-philosophy-scraper/releases/latest)**
 
 The app saves an EPUB for each essay from [1000-Word Philosophy](https://1000wordphilosophy.com/). It includes images, headings, the main text, notes, references, further reading and appendices. Numbered notes link back to the text; mathematical superscripts and subscripts are retained. Every EPUB has a table of contents. Website menus, related-essay recommendations, subscription forms and author biographies are removed.
 
@@ -13,7 +13,7 @@ The app saves an EPUB for each essay from [1000-Word Philosophy](https://1000wor
 
 An empty folder starts the complete collection. A folder with existing progress downloads only missing essays. The button becomes **Stop after this article** while a download runs. Keep the app open until it finishes.
 
-### Web / Windows / Linux
+### Web / Mac / Windows / Linux
 
 The GitHub Pages version runs entirely in your browser and reads the website's public WordPress API. It has no proxy, server account or API key. Your selected folder and its contents are not uploaded.
 
@@ -37,11 +37,7 @@ The folder button offers a simple device-folder picker and Android's system fold
 
 Official sideloading references: [A5 X / A6 X](https://support.supernote.com/en_US/changelog-for-a5-x-and-a6-x), [Nomad / Manta](https://support.supernote.com/changelog-for-manta-and-nomad).
 
-### Mac
-
-Unzip the Mac release and open the app. It is a universal Intel/Apple silicon binary for macOS 12+. The release is locally signed, not Apple-notarized. No separate Python or Node installation is required to run it.
-
-A native iOS build is deferred. The browser ZIP workflow is available on iOS.
+Mac, Windows and Linux use the web version. A native iOS build is deferred; iOS browsers can use ZIP export.
 
 ## Synced progress
 
@@ -55,9 +51,9 @@ A native iOS build is deferred. The browser ZIP workflow is available on iOS.
 
 ## Builds and releases
 
-- **CI:** browser/controller tests plus native Mac and Android compilation on pushes and pull requests. CI Android artifacts use a temporary development key.
+- **CI:** browser/controller tests plus native Android compilation on pushes and pull requests. CI Android artifacts use a temporary development key.
 - **GitHub Pages:** deploys after successful CI, on manual dispatch, and daily to refresh the site's policy snapshot.
-- **Release:** pushing a `v*` tag runs tests, builds Mac/Android packages, creates checksums and publishes a GitHub release.
+- **Release:** pushing a `v*` tag runs tests, builds the Android APK, creates checksums and publishes a GitHub release.
 
 Release Android builds use encrypted repository secrets `ANDROID_KEYSTORE_BASE64` and `ANDROID_KEYSTORE_PASSWORD`. These contain the original app signing identity so updates remain compatible. Private keys and passwords must never be committed. Without these secrets, release signing fails rather than silently using a new identity.
 
@@ -76,14 +72,13 @@ Serve `dist/web` with an HTTP server. Direct folder access requires HTTPS or loc
 python3 -m http.server 8000 --directory dist/web
 ```
 
-Native builds:
+Android build:
 
 ```sh
-python3 build.py mac
 python3 build.py android
 ```
 
-Mac requires Xcode command-line tools. Android requires Java 21 and Android SDK platform 35/build-tools 35.0.0; set `ANDROID_HOME` if needed. Build output is in `dist/`, intermediates and development signing data in `.build/`. Set `ANDROID_KEYSTORE_PATH` and `ANDROID_KEYSTORE_PASSWORD` for a locally release-signed APK. `RELEASE_BUILD=1` requires those settings. `APP_VERSION`, `POCKET_OUTPUT` and `POCKET_BUILD` override version and output paths.
+Android requires Java 21 and Android SDK platform 35/build-tools 35.0.0; set `ANDROID_HOME` if needed. Build output is in `dist/`, intermediates and development signing data in `.build/`. Set `ANDROID_KEYSTORE_PATH` and `ANDROID_KEYSTORE_PASSWORD` for a locally release-signed APK. `RELEASE_BUILD=1` requires those settings. `APP_VERSION`, `POCKET_OUTPUT` and `POCKET_BUILD` override version and output paths.
 
 The runtime has no third-party libraries. Playwright is a development-only test dependency. Tests use three original synthetic articles, check all internal EPUB targets, images, note backlinks, appendix retention, mathematical notation, folder switching, corrupted history, repeat-download prevention, API pagination and ZIP export/import.
 

@@ -19,18 +19,6 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: npm test
-  mac:
-    needs: test
-    runs-on: macos-15
-    env:
-      APP_VERSION: ${{ github.ref_name }}
-    steps:
-      - uses: actions/checkout@v7.0.1
-      - run: python3 build.py mac
-      - uses: actions/upload-artifact@v7.0.2
-        with:
-          name: release-mac
-          path: dist/1000-Word-Philosophy-Mac.zip
   android:
     needs: test
     runs-on: ubuntu-24.04
@@ -67,7 +55,7 @@ jobs:
           name: release-android
           path: dist/1000-Word-Philosophy-Android.apk
   publish:
-    needs: [mac, android]
+    needs: [android]
     runs-on: ubuntu-24.04
     permissions:
       contents: write

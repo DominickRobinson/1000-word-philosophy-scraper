@@ -26,16 +26,6 @@ jobs:
         with:
           name: test-results
           path: .build/tests
-  mac:
-    needs: test
-    runs-on: macos-15
-    steps:
-      - uses: actions/checkout@v7.0.1
-      - run: python3 build.py mac
-      - uses: actions/upload-artifact@v7.0.2
-        with:
-          name: mac-ci
-          path: dist/1000-Word-Philosophy-Mac.zip
   android:
     needs: test
     runs-on: ubuntu-24.04

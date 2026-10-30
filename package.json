@@ -6,7 +6,6 @@
   "scripts": {
     "test": "node tests/check.cjs",
     "build:web": "python3 scripts/build_web.py",
-    "build:mac": "python3 build.py mac",
     "build:android": "python3 build.py android"
   },
   "devDependencies": {"playwright": "1.64.1"}
