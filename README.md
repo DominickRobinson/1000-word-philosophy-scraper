@@ -4,7 +4,7 @@ A small, e-ink-friendly tool with two buttons: **Choose folder** and **Download 
 
 **[Open the web app](https://dominickrobinson.github.io/1000-word-philosophy-scraper/)** · **[Download Android](https://github.com/DominickRobinson/1000-word-philosophy-scraper/releases/latest)**
 
-The app reads the All Essays directory and public WordPress metadata to resolve outdated links and include newly published essays. It saves an EPUB for each essay from [1000-Word Philosophy](https://1000wordphilosophy.com/). It includes images, headings, the main text, notes, references, further reading and appendices. Numbered notes link back to the text; mathematical superscripts and subscripts are retained. Every EPUB has a table of contents. Website menus, related-essay recommendations, subscription forms and author biographies are removed.
+The app reads the All Essays directory and public WordPress metadata to resolve outdated links and include newly published essays. It saves an EPUB for each essay from [1000-Word Philosophy](https://1000wordphilosophy.com/). It includes images, headings, the main text, notes, references, further reading and appendices. In-text citation markers link to their notes; mathematical superscripts and subscripts are retained. Every EPUB has a table of contents. Website menus, related-essay recommendations, subscription forms and author biographies are removed.
 
 ## Use
 
@@ -18,7 +18,7 @@ An empty folder starts the complete collection. A folder with existing progress 
 The GitHub Pages version runs entirely in your browser and reads the website's public WordPress API. It has no proxy, server account or API key. Your selected folder and its contents are not uploaded.
 
 - **Desktop Chrome or Edge:** choose a writable directory. EPUBs and the TXT record are saved directly there.
-- **Safari, Firefox and iOS browsers:** choose a directory to import its existing TXT record, then download. The main button becomes **Save ZIP**. Extract that ZIP into the library directory, including the updated TXT file. To start a fresh ZIP library, cancel the first folder picker. Existing source files are not copied into the ZIP; it contains new files and the updated history.
+- **Safari, Firefox and iOS browsers:** choose a directory to import its existing TXT record, then download. The main button becomes **Save ZIP**. Extract that ZIP into the library directory, including the updated TXT file. To start a fresh ZIP library, cancel the first folder picker. The ZIP contains new files, updated history, and any legacy files being relocated. Extract it preserving the subfolders; ZIP export cannot remove old files from your original folder.
 - A static browser session cannot automatically write to a folder that the browser has not granted access to. ZIP export handles that restriction without uploading your files.
 
 The source site's robots.txt is checked during each web deployment. A daily Pages workflow refreshes this policy snapshot. The web app stops if it is more than eight days old; running the Pages workflow refreshes it. Native apps read robots.txt directly on every run.
@@ -33,7 +33,7 @@ Enable sideloading under **Settings → Security & Privacy** on supported Supern
 adb install -r 1000-Word-Philosophy-Android.apk
 ```
 
-The folder button offers a simple device-folder picker and Android's system folder picker. Select a directory such as `Document/Philosophy`. The device-folder picker requests storage access and uses only the chosen directory.
+The folder button offers a simple device-folder picker and Android's system folder picker. Select a directory such as `Document/Philosophy`. The device-folder picker requests storage access and uses only the chosen directory. In the device picker, the fixed **Select folder** button sits below the scrollable folder list.
 
 Official sideloading references: [A5 X / A6 X](https://support.supernote.com/en_US/changelog-for-a5-x-and-a6-x), [Nomad / Manta](https://support.supernote.com/changelog-for-manta-and-nomad).
 
@@ -41,7 +41,7 @@ Mac, Windows and Linux use the web version. A native iOS build is deferred; iOS 
 
 ## Synced progress
 
-`philosophy-library.txt` is the portable source of download history. It contains readable UTF-8 JSON and sits beside the EPUBs. A prior copy is kept as `philosophy-library.backup.txt`.
+`philosophy-library.txt` is the portable source of download history. It contains readable UTF-8 JSON and lives in the visible `app-data/` subfolder. A prior copy is kept as `philosophy-library.backup.txt`.
 
 - The TXT file is read before every essay fetch and merged immediately before a successful save.
 - An existing record skips an essay even if the EPUB has not yet synced to this device. An existing EPUB with the expected filename is also skipped.
@@ -51,9 +51,24 @@ Mac, Windows and Linux use the web version. A native iOS build is deferred; iOS 
 
 ## Filenames and master index
 
+The selected folder contains:
+
+```text
+All Papers.epub
+papers/
+  Article title.epub
+app-data/
+  philosophy-library.txt
+  philosophy-library.backup.txt
+```
+
+The data folder is visible because Supernote's documentation does not confirm hidden-folder sync support. Include it in your sync selection. On opening an existing library, the app relocates files named in its history and the TXT records without fetching essays again. Files with conflicting names in both locations are preserved for manual review. Untracked files are left untouched. The old All Essays.epub is removed after the new master index is saved (except in ZIP mode, where old originals must be removed manually).
+
+Newly generated EPUBs omit the Return to text buttons. Existing EPUB contents are preserved when relocated.
+
 New EPUB filenames use article titles without date prefixes. Filesystem-reserved characters are removed or replaced. Existing dated filenames and synced TXT records are still recognized; existing files are not renamed or fetched again.
 
-Every run refreshes **All Essays.epub**, with **By Category** and **By Date** sections in its table of contents. Article titles link to the original website; find downloaded essays by their title-only filenames. There are no cross-file local links.
+Every run refreshes **All Papers.epub**, with **By Category** and **By Date** sections in its table of contents. Article titles link to the original website; find downloaded essays by their title-only filenames. There are no cross-file local links.
 
 An explicit withdrawal notice, such as The Problem of Induction, is recorded under `unavailable` in the same TXT file. The app checks it again when the website's modification date changes, rather than repeatedly downloading the unchanged notice.
 
@@ -88,7 +103,7 @@ python3 build.py android
 
 Android requires Java 21 and Android SDK platform 35/build-tools 35.0.0; set `ANDROID_HOME` if needed. Build output is in `dist/`, intermediates and development signing data in `.build/`. Set `ANDROID_KEYSTORE_PATH` and `ANDROID_KEYSTORE_PASSWORD` for a locally release-signed APK. `RELEASE_BUILD=1` requires those settings. `APP_VERSION`, `POCKET_OUTPUT` and `POCKET_BUILD` override version and output paths.
 
-The runtime has no third-party libraries. Playwright is a development-only test dependency. Tests use three original synthetic articles, check all internal EPUB targets, images, note backlinks, appendix retention, mathematical notation, folder switching, corrupted history, repeat-download prevention, API pagination and ZIP export/import.
+The runtime has no third-party libraries. Playwright is a development-only test dependency. Tests use three original synthetic articles, check all internal EPUB targets, images, citation links, appendix retention, mathematical notation, folder switching, corrupted history, repeat-download prevention, API pagination and ZIP export/import.
 
 ## Source and attribution
 

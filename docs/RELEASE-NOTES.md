@@ -1,13 +1,9 @@
-Android downloads are restored. Install the APK below to save EPUBs directly into a chosen folder, or [open the web app](https://www.dominick.fyi/1000-word-philosophy-scraper/).
+Save individual essays in `papers/`, the category/date index as `All Papers.epub`, and portable TXT history in visible `app-data/` inside your selected folder. Existing tracked files are relocated without fetching articles again; conflicting files are preserved. Include app-data in your sync selection. Hidden-folder sync is not confirmed by Supernote documentation.
 
-- Avoid stale source API cache responses that lack browser access headers.
-- Read the All Essays directory and resolve its old links to current article URLs. This fixes Hell and Universalism.
-- Cap embedded images at 1,600 pixels on the longest edge without enlarging small images, and request resized images from the site when available. If an image fails, save the essay without it and record the warning.
-- Recognize explicit unavailable notices, such as The Problem of Induction, and recheck when the source changes.
-- Save new essay EPUBs with title-only filenames. Existing filenames and synced TXT history still prevent repeat downloads.
-- Generate All Essays.epub with By Category and By Date navigation. Article titles link to the website; downloaded files can be found by title.
+- New EPUBs retain clickable citations but omit the Return to text buttons beneath notes. Existing EPUB contents are preserved.
+- The Android device-folder picker has a scrollable folder list and fixed, high-contrast Select folder, New folder, and Cancel buttons.
+- Browser folder access and ZIP export use the same layout. ZIP extraction cannot remove old files; remove old root copies after checking the extracted library.
 
+[Open the web app](https://www.dominick.fyi/1000-word-philosophy-scraper/) or install the APK below. It uses the original signing identity and updates previous installations. Android 8+; no Google Play services needed. Browser regression tests and Android compilation pass; physical Supernote validation is still needed.
 
-The APK uses the existing signing key and can update previous installations. Android 8+; no Google Play services required. Physical Supernote testing is still needed. Automated tests cover the reported failures, saved history, old aliases and filenames, master indexes, images, citations and ZIP export.
-
-SHA256SUMS.txt is a public download-integrity checksum, not a signing secret. GitHub also adds automatic source archives.
+SHA256SUMS.txt is public download-integrity metadata. GitHub adds automatic source archives.

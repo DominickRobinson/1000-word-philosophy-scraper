@@ -65,7 +65,7 @@ public class MainActivity extends Activity {
         }
     }
     void chooseFolder(){
-        new AlertDialog.Builder(this).setTitle("Save your EPUBs").setItems(new String[]{"Choose a device folder (Supernote)","Choose with Android file picker"},(dialog,which)->{
+        new AlertDialog.Builder(this,android.R.style.Theme_Material_Light_Dialog_Alert).setTitle("Save your EPUBs").setItems(new String[]{"Choose a device folder (Supernote)","Choose with Android file picker"},(dialog,which)->{
             if(which==0){if(checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)!=PackageManager.PERMISSION_GRANTED)requestPermissions(new String[]{Manifest.permission.READ_EXTERNAL_STORAGE,Manifest.permission.WRITE_EXTERNAL_STORAGE},42);else browse(Environment.getExternalStorageDirectory());}
             else{try{Intent intent=new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_GRANT_WRITE_URI_PERMISSION|Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION|Intent.FLAG_GRANT_PREFIX_URI_PERMISSION);startActivityForResult(intent,41);}catch(ActivityNotFoundException e){reply(pickerId,null,"No Android folder picker is installed. Choose a device folder instead.");}}
         }).setNegativeButton("Cancel",(d,w)->reply(pickerId,null,null)).setOnCancelListener(d->reply(pickerId,null,null)).show();
@@ -73,36 +73,85 @@ public class MainActivity extends Activity {
     public void onRequestPermissionsResult(int request,String[] permissions,int[] grants){super.onRequestPermissionsResult(request,permissions,grants);if(request==42){if(checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)==PackageManager.PERMISSION_GRANTED)browse(Environment.getExternalStorageDirectory());else reply(pickerId,null,"Folder permission was not granted. Try the Android file picker.");}}
     void browse(File directory){
         File[] dirs=directory.listFiles(f->f.isDirectory()&&!f.getName().startsWith("."));if(dirs==null)dirs=new File[0];Arrays.sort(dirs,Comparator.comparing(File::getName));final File[] children=dirs;ArrayList<String> names=new ArrayList<>();boolean hasParent=!directory.equals(Environment.getExternalStorageDirectory());if(hasParent)names.add("↑ Parent folder");for(File f:children)names.add(f.getName()+"/");
-        new AlertDialog.Builder(this).setTitle(directory.getAbsolutePath()).setItems(names.toArray(new String[0]),(d,which)->{if(hasParent&&which==0)browse(directory.getParentFile());else browse(children[which-(hasParent?1:0)]);}).setPositiveButton("Use this folder",(d,w)->{folder=directory.getAbsolutePath();saveFolder();}).setNeutralButton("New folder",(d,w)->{EditText input=new EditText(this);input.setSingleLine(true);input.setText("Philosophy");new AlertDialog.Builder(this).setTitle("New folder").setView(input).setPositiveButton("Create",(d2,w2)->{String name=input.getText().toString().trim();if(name.isEmpty()||name.contains("/")||name.equals("..")){reply(pickerId,null,"Invalid folder name");return;}File child=new File(directory,name);if(child.mkdir()||child.isDirectory())browse(child);else reply(pickerId,null,"Could not create folder");}).setNegativeButton("Cancel",(d2,w2)->browse(directory)).show();}).setNegativeButton("Cancel",(d,w)->reply(pickerId,null,null)).setOnCancelListener(d->reply(pickerId,null,null)).show();
+        // Own the layout and colors: some e-ink firmware hides stock dialog action buttons.
+        final Dialog dialog=new Dialog(this,android.R.style.Theme_Material_Light_NoActionBar);
+        LinearLayout layout=new LinearLayout(this);layout.setOrientation(LinearLayout.VERTICAL);layout.setBackgroundColor(0xffffffff);layout.setPadding(20,20,20,20);
+        TextView path=new TextView(this);path.setText(directory.getAbsolutePath());path.setTextColor(0xff000000);path.setTextSize(18);path.setMaxLines(3);layout.addView(path);
+        ListView list=new ListView(this);list.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_list_item_1,names){
+            public View getView(int position,View convert,ViewGroup parent){TextView row=(TextView)super.getView(position,convert,parent);row.setTextColor(0xff000000);row.setBackgroundColor(0xffffffff);return row;}
+        });layout.addView(list,new LinearLayout.LayoutParams(-1,0,1));
+        list.setOnItemClickListener((parent,view,which,id)->{dialog.dismiss();if(hasParent&&which==0)browse(directory.getParentFile());else browse(children[which-(hasParent?1:0)]);});
+        Button select=pickerButton("Select folder");layout.addView(select);select.setOnClickListener(v->{dialog.dismiss();folder=directory.getAbsolutePath();saveFolder();});
+        Button create=pickerButton("New folder");layout.addView(create);create.setOnClickListener(v->{
+            dialog.dismiss();EditText input=new EditText(this);input.setSingleLine(true);input.setText("Philosophy");
+            new AlertDialog.Builder(this,android.R.style.Theme_Material_Light_Dialog_Alert).setTitle("New folder").setView(input).setPositiveButton("Create",(d,w)->{
+                String name=input.getText().toString().trim();if(name.isEmpty()||name.contains("/")||name.equals("..")){reply(pickerId,null,"Invalid folder name");return;}
+                File child=new File(directory,name);if(child.mkdir()||child.isDirectory())browse(child);else reply(pickerId,null,"Could not create folder");
+            }).setNegativeButton("Cancel",(d,w)->browse(directory)).setOnCancelListener(d->browse(directory)).show();
+        });
+        Button cancel=pickerButton("Cancel");layout.addView(cancel);cancel.setOnClickListener(v->{dialog.dismiss();reply(pickerId,null,null);});
+        dialog.setContentView(layout);dialog.setOnCancelListener(d->reply(pickerId,null,null));dialog.show();dialog.getWindow().setLayout(-1,-1);
     }
+    Button pickerButton(String title){Button button=new Button(this);button.setText(title);button.setTextSize(18);button.setTextColor(0xff000000);button.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xffeeeeee));button.setAllCaps(false);button.setMinHeight((int)(56*getResources().getDisplayMetrics().density));return button;}
+
     void saveFolder(){try{getPreferences(0).edit().putString("folder",folder).apply();reply(pickerId,folderInfo(),null);}catch(Exception e){reply(pickerId,null,e.getMessage());}}
     protected void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);if(request==41){if(result==RESULT_OK&&data!=null&&data.getData()!=null){try{Uri uri=data.getData();getContentResolver().takePersistableUriPermission(uri,data.getFlags()&(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_GRANT_WRITE_URI_PERMISSION));folder=uri.toString();saveFolder();}catch(Exception e){reply(pickerId,null,e.getMessage());}}else reply(pickerId,null,null);}}
-    Map<String,Uri> documents()throws Exception{
-        Map<String,Uri> result=new HashMap<>();Uri tree=Uri.parse(folder),children=DocumentsContract.buildChildDocumentsUriUsingTree(tree,DocumentsContract.getTreeDocumentId(tree));
-        try(Cursor c=getContentResolver().query(children,new String[]{DocumentsContract.Document.COLUMN_DOCUMENT_ID,DocumentsContract.Document.COLUMN_DISPLAY_NAME},null,null,null)){if(c==null)throw new IOException("Could not read the chosen folder");while(c.moveToNext())result.put(c.getString(1),DocumentsContract.buildDocumentUriUsingTree(tree,c.getString(0)));}return result;
+    Uri rootUri(){Uri tree=Uri.parse(folder);return DocumentsContract.buildDocumentUriUsingTree(tree,DocumentsContract.getTreeDocumentId(tree));}
+    Map<String,Uri> documents(Uri parent)throws Exception{
+        Map<String,Uri> result=new HashMap<>();Uri children=DocumentsContract.buildChildDocumentsUriUsingTree(Uri.parse(folder),DocumentsContract.getDocumentId(parent));
+        try(Cursor c=getContentResolver().query(children,new String[]{DocumentsContract.Document.COLUMN_DOCUMENT_ID,DocumentsContract.Document.COLUMN_DISPLAY_NAME},null,null,null)){if(c==null)throw new IOException("Could not read the chosen folder");while(c.moveToNext())result.put(c.getString(1),DocumentsContract.buildDocumentUriUsingTree(Uri.parse(folder),c.getString(0)));}return result;
+    }
+    Uri parentUri(String sub,boolean create)throws Exception{
+        Uri root=rootUri();if(sub.isEmpty())return root;Uri child=documents(root).get(sub);
+        if(child==null&&create)child=DocumentsContract.createDocument(getContentResolver(),root,DocumentsContract.Document.MIME_TYPE_DIR,sub);
+        if(child==null&&create)throw new IOException("Cannot create "+sub);return child;
+    }
+    String outputFolder(String name){return name.equals("All Papers.epub")?"":name.endsWith(".txt")?"app-data":"papers";}
+    void validateName(String name)throws IOException{if(name.contains("/")||name.contains("\\")||name.startsWith(".")||!(name.endsWith(".epub")||name.equals("philosophy-library.txt")||name.equals("philosophy-library.backup.txt")))throw new IOException("Invalid output file");}
+    Set<String> names(String sub)throws Exception{
+        if(folder.startsWith("content:")){Uri parent=parentUri(sub,false);return parent==null?new HashSet<>():new HashSet<>(documents(parent).keySet());}
+        File dir=sub.isEmpty()?new File(folder):new File(folder,sub);String[] files=dir.list();if(files==null&&sub.isEmpty())throw new IOException("Folder is unavailable. Choose it again.");return files==null?new HashSet<>():new HashSet<>(Arrays.asList(files));
+    }
+    byte[] readFile(String sub,String name)throws Exception{
+        if(folder.startsWith("content:")){Uri parent=parentUri(sub,false);if(parent==null)return null;Uri file=documents(parent).get(name);return file==null?null:readAll(getContentResolver().openInputStream(file));}
+        File file=new File(sub.isEmpty()?new File(folder):new File(folder,sub),name);return file.isFile()?readAll(new FileInputStream(file)):null;
+    }
+    void removeFile(String sub,String name)throws Exception{
+        if(folder.startsWith("content:")){Uri parent=parentUri(sub,false);if(parent!=null){Uri file=documents(parent).get(name);if(file!=null&&!DocumentsContract.deleteDocument(getContentResolver(),file))throw new IOException("Could not remove old file");}}
+        else java.nio.file.Files.deleteIfExists(new File(sub.isEmpty()?new File(folder):new File(folder,sub),name).toPath());
     }
     byte[] readAll(InputStream stream)throws Exception{if(stream==null)throw new IOException("Could not open file");try(InputStream in=stream;ByteArrayOutputStream out=new ByteArrayOutputStream()){byte[] buffer=new byte[16384];int n;while((n=in.read(buffer))!=-1){out.write(buffer,0,n);if(out.size()>20000000)throw new IOException("File exceeds 20 MB limit");}return out.toByteArray();}}
     JSONObject library()throws Exception{
-        if(folder==null)throw new IOException("Choose a folder first");JSONArray names=new JSONArray();String ledger="";
-        if(folder.startsWith("content:")){Map<String,Uri> docs=documents();for(String name:docs.keySet())names.put(name);Uri record=docs.get("philosophy-library.txt");if(record==null)record=docs.get("philosophy-library.backup.txt");if(record!=null)ledger=new String(readAll(getContentResolver().openInputStream(record)),StandardCharsets.UTF_8);}
-        else{File root=new File(folder);String[] files=root.list();if(files==null)throw new IOException("Folder is unavailable. Choose it again.");for(String name:files)names.put(name);File file=new File(root,"philosophy-library.txt");if(!file.exists())file=new File(root,"philosophy-library.backup.txt");if(file.exists())ledger=new String(readAll(new FileInputStream(file)),StandardCharsets.UTF_8);}
-        return new JSONObject().put("files",names).put("ledger",ledger);
+        if(folder==null)throw new IOException("Choose a folder first");
+        byte[] record=readFile("app-data","philosophy-library.txt");if(record==null)record=readFile("","philosophy-library.txt");
+        if(record==null)record=readFile("app-data","philosophy-library.backup.txt");if(record==null)record=readFile("","philosophy-library.backup.txt");
+        String ledger=record==null?"":new String(record,StandardCharsets.UTF_8);
+        Set<String> legacy=new HashSet<>();
+        if(!ledger.isEmpty()){
+            JSONObject history=new JSONObject(ledger);if(!history.optString("format").equals("philosophy-pocket-library")||history.optInt("version")!=1)throw new IOException("Unrecognized download history");
+            JSONObject articles=history.getJSONObject("articles");Iterator<String> keys=articles.keys();while(keys.hasNext()){String file=articles.getJSONObject(keys.next()).optString("file");if(!file.isEmpty())legacy.add(file);}
+        }
+        legacy.add("philosophy-library.txt");legacy.add("philosophy-library.backup.txt");Set<String> rootNames=names("");
+        for(String name:legacy){validateName(name);String target=outputFolder(name);if(!rootNames.contains(name)||names(target).contains(name))continue;byte[] old=readFile("",name);if(old!=null){writeFile(target,name,old,false);removeFile("",name);}}
+        Set<String> all=names("");all.addAll(names("papers"));return new JSONObject().put("files",new JSONArray(all)).put("ledger",ledger);
     }
     void write(JSONObject args)throws Exception{
-        if(folder==null)throw new IOException("Choose a folder first");String name=args.getString("name");if(name.contains("/")||name.contains("\\")||name.startsWith(".")||!(name.endsWith(".epub")||name.equals("philosophy-library.txt")))throw new IOException("Invalid output file");
+        if(folder==null)throw new IOException("Choose a folder first");String name=args.getString("name");validateName(name);String sub=outputFolder(name);
         byte[] data=args.has("base64")?android.util.Base64.decode(args.getString("base64"),android.util.Base64.DEFAULT):args.getString("text").getBytes(StandardCharsets.UTF_8);
-        boolean replace=args.optBoolean("replace");
+        if(name.equals("philosophy-library.txt")){byte[] old=readFile(sub,name);if(old!=null)writeFile(sub,"philosophy-library.backup.txt",old,true);}
+        writeFile(sub,name,data,args.optBoolean("replace"));
+        if(name.equals("All Papers.epub"))removeFile("","All Essays.epub");
+    }
+    void writeFile(String sub,String name,byte[] data,boolean replace)throws Exception{
         if(folder.startsWith("content:")){
-            Map<String,Uri> docs=documents();if(docs.containsKey(name)&&!replace)return;
-            Uri tree=Uri.parse(folder),parent=DocumentsContract.buildDocumentUriUsingTree(tree,DocumentsContract.getTreeDocumentId(tree));
-            if(name.equals("philosophy-library.txt")&&docs.containsKey(name)){byte[] old=readAll(getContentResolver().openInputStream(docs.get(name)));Uri backup=docs.get("philosophy-library.backup.txt");if(backup==null)backup=DocumentsContract.createDocument(getContentResolver(),parent,"text/plain","philosophy-library.backup.txt");try(OutputStream out=getContentResolver().openOutputStream(backup,"wt")){if(out==null)throw new IOException("Cannot write backup");out.write(old);}}
-            // Stage a complete file before replacing the destination. The old ledger is backed up first.
+            Uri parent=parentUri(sub,true);Map<String,Uri> docs=documents(parent);if(docs.containsKey(name)&&!replace)return;
             Uri temporary=DocumentsContract.createDocument(getContentResolver(),parent,name.endsWith(".epub")?"application/epub+zip":"text/plain",name+".partial");if(temporary==null)throw new IOException("Cannot create output file");
-            try{try(OutputStream out=getContentResolver().openOutputStream(temporary,"wt")){if(out==null)throw new IOException("Cannot write output file");out.write(data);out.flush();}if(docs.containsKey(name))DocumentsContract.deleteDocument(getContentResolver(),docs.get(name));if(DocumentsContract.renameDocument(getContentResolver(),temporary,name)==null)throw new IOException("The file provider could not finish saving. The .partial file contains the completed data.");}catch(Exception e){throw e;}
+            try(OutputStream out=getContentResolver().openOutputStream(temporary,"wt")){if(out==null)throw new IOException("Cannot write output file");out.write(data);out.flush();}
+            if(docs.containsKey(name))DocumentsContract.deleteDocument(getContentResolver(),docs.get(name));
+            if(DocumentsContract.renameDocument(getContentResolver(),temporary,name)==null)throw new IOException("The file provider could not finish saving. The .partial file contains the completed data.");
         }else{
-            File destination=new File(folder,name);if(destination.exists()&&!replace)return;
-            if(name.equals("philosophy-library.txt")&&destination.exists())atomicWrite(new File(folder,"philosophy-library.backup.txt"),readAll(new FileInputStream(destination)));
-            atomicWrite(destination,data);
+            File parent=sub.isEmpty()?new File(folder):new File(folder,sub);if(!parent.isDirectory()&&!parent.mkdirs())throw new IOException("Cannot create "+sub);
+            File destination=new File(parent,name);if(destination.exists()&&!replace)return;atomicWrite(destination,data);
         }
     }
     void atomicWrite(File target,byte[] bytes)throws Exception{File tmp=new File(target.getParentFile(),target.getName()+".partial");try(FileOutputStream out=new FileOutputStream(tmp)){out.write(bytes);out.getFD().sync();}java.nio.file.Files.move(tmp.toPath(),target.toPath(),java.nio.file.StandardCopyOption.ATOMIC_MOVE,java.nio.file.StandardCopyOption.REPLACE_EXISTING);}

@@ -7,26 +7,46 @@
   function safeName(name){if(typeof name!=='string'||name.includes('/')||name.includes('\\')||name.startsWith('.')||!(name.endsWith('.epub')||name==='philosophy-library.txt'||name==='philosophy-library.backup.txt'))throw new Error('Invalid output filename.');return name;}
   function decode(s){const raw=atob(s),out=new Uint8Array(raw.length);for(let i=0;i<raw.length;i++)out[i]=raw.charCodeAt(i);return out;}
   function encode(bytes){let raw='';for(let i=0;i<bytes.length;i+=16384)raw+=String.fromCharCode.apply(null,bytes.subarray(i,i+16384));return btoa(raw);}
-  async function read(name){
-    if(mode==='direct'){
-      try{return await (await directory.getFileHandle(name)).getFile();}catch(e){if(e.name==='NotFoundError')return null;throw e;}
-    }return writes.get(name)||imports.get(name)||null;
+  function outputPath(name){safeName(name);return name==='All Papers.epub'?name:name.endsWith('.txt')?'app-data/'+name:'papers/'+name;}
+  async function parent(path,create){const parts=path.split('/');let dir=directory;for(const part of parts.slice(0,-1))dir=await dir.getDirectoryHandle(part,{create:!!create});return {dir,name:parts[parts.length-1]};}
+  async function readPath(path){
+    if(mode==='direct'){try{const {dir,name}=await parent(path,false);return await (await dir.getFileHandle(name)).getFile();}catch(e){if(e.name==='NotFoundError')return null;throw e;}}
+    return writes.get(path)||imports.get(path)||null;
   }
+  async function removePath(path){if(mode==='direct'){const {dir,name}=await parent(path,false);await dir.removeEntry(name);}else{imports.delete(path);writes.delete(path);}}
+  async function writePath(path,data,replace){
+    if(!replace&&await readPath(path))return {skipped:true};
+    if(mode==='direct'){
+      const {dir,name}=await parent(path,true),file=await dir.getFileHandle(name,{create:true}),stream=await file.createWritable();
+      try{await stream.write(data);await stream.close();}catch(e){await stream.abort().catch(()=>{});throw e;}
+    }else writes.set(path,new Blob([data],{type:path.endsWith('.epub')?'application/epub+zip':'text/plain;charset=utf-8'}));
+    return {saved:true};
+  }
+  async function read(name){return await readPath(outputPath(name))||await readPath(name);}
   async function library(){
     if(!mode)throw new Error('Choose a folder first.');
-    let files=[];
-    if(mode==='direct'){for await(const [name,handle] of directory.entries())if(handle.kind==='file')files.push(name);}
-    else files=Array.from(new Set(Array.from(imports.keys()).concat(Array.from(writes.keys()))));
     const record=await read('philosophy-library.txt')||await read('philosophy-library.backup.txt');
-    return {files:files,ledger:record?await record.text():''};
+    const ledger=record?await record.text():'';
+    // Validate first. Never relocate files on the strength of corrupt history.
+    const history=window.Philosophy.readLedger(ledger);
+    const legacy=new Set(Object.values(history.articles).map(a=>a.file).filter(Boolean));
+    legacy.add('philosophy-library.txt');legacy.add('philosophy-library.backup.txt');
+    for(const name of legacy){safeName(name);const old=await readPath(name);if(!old)continue;
+      const target=outputPath(name);
+      if(!await readPath(target)){await writePath(target,await old.arrayBuffer(),false);await removePath(name);}
+      // If both locations exist, retain the old file rather than risk discarding a synced conflict.
+    }
+    let files=[];
+    if(mode==='direct'){
+      for await(const [name,handle] of directory.entries())if(handle.kind==='file')files.push(name);
+      try{const papers=await directory.getDirectoryHandle('papers');for await(const [name,handle] of papers.entries())if(handle.kind==='file')files.push(name);}catch(e){if(e.name!=='NotFoundError')throw e;}
+    }else files=Array.from(new Set([...imports.keys(),...writes.keys()])).filter(p=>!p.includes('/')||p.startsWith('papers/')).map(p=>p.split('/').pop());
+    return {files,ledger};
   }
   async function writeFile(name,data,replace){
-    safeName(name);if(!replace&&await read(name))return {skipped:true};
-    if(mode==='direct'){
-      const file=await directory.getFileHandle(name,{create:true}),stream=await file.createWritable();
-      try{await stream.write(data);await stream.close();}catch(e){await stream.abort().catch(()=>{});throw e;}
-    }else{writes.set(name,new Blob([data],{type:name.endsWith('.epub')?'application/epub+zip':'text/plain;charset=utf-8'}));}
-    return {saved:true};
+    const result=await writePath(outputPath(name),data,replace);
+    if(name==='All Papers.epub'&&await readPath('All Essays.epub'))await removePath('All Essays.epub');
+    return result;
   }
   async function choose(){
     if(typeof window.showDirectoryPicker==='function'){
@@ -42,7 +62,7 @@
     });
     if(!choice.length&&mode)return null;
     imports=new Map();writes=new Map();directory=null;mode='zip';
-    choice.forEach(file=>{const parts=(file.webkitRelativePath||file.name).split('/');if(parts.length<=2)imports.set(file.name,file);});
+    choice.forEach(file=>{const parts=(file.webkitRelativePath||file.name).split('/');const relative=parts.length>1?parts.slice(1).join('/'):file.name;if(parts.length<=2||parts.length===3&&['papers','app-data'].includes(parts[1]))imports.set(relative,file);});
     label=choice.length?(choice[0].webkitRelativePath.split('/')[0]||'Imported library')+' — ZIP export':'New library — ZIP export';
     return {label:label};
   }

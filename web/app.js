@@ -51,7 +51,7 @@
   }
   async function run(){
     if(state.busy){state.stop=true;render();return;}if(!state.folder)return;
-    if(state.exportPending){try{await native('export');state.exportPending=false;progress(1,1,'ZIP exported.','Extract it into your library folder, including philosophy-library.txt.');render();}catch(e){showError(e.message);}return;}
+    if(state.exportPending){try{await native('export');state.exportPending=false;progress(1,1,'ZIP exported.','Extract it into your library folder, including the app-data folder.');render();}catch(e){showError(e.message);}return;}
     state.busy=true;state.stop=false;state.errors=[];$('errors').hidden=true;render();let complete=0,total=0,downloaded=0,skipped=0,failed=0,unavailable=0,directorySource=null;
     try{
       await loadLibrary();await native('keepAwake',{on:true});progress(0,0,'Checking for new articles…');await robots();
@@ -84,7 +84,7 @@
     finally{
       if(directorySource&&state.articles.length){try{
         await loadLibrary();const options={ledger:state.ledger,files:state.files};
-        await native('write',{name:'All Essays.epub',base64:b64(P.directoryBook(directorySource,state.articles,options)),replace:true});
+        await native('write',{name:'All Papers.epub',base64:b64(P.directoryBook(directorySource,state.articles,options)),replace:true});
       }catch(e){showError('Could not save the master index: '+e.message);}}
       if(window.browserNative){const finished=await native('finishRun');state.exportPending=!!finished.exportPending;if(state.exportPending){$('status').textContent='Ready to save.';$('detail').textContent='Save the ZIP, then extract it into your library folder.';}}if(state.stop)progress(complete,total,'Stopped.',downloaded+' downloaded');await native('keepAwake',{on:false}).catch(()=>{});state.busy=false;state.stop=false;render();}
   }

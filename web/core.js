@@ -238,9 +238,7 @@
     notes.forEach((el,n) => {
       const list=refs.get(n);
       if(!list.length) warnings.push('Note '+n+' has no identifiable in-text marker.');
-      const p=doc.createElement('p');p.setAttribute('class','backlinks');
-      list.forEach((id,i) => {const a=doc.createElement('a');a.setAttribute('href','#'+id);a.setAttribute('role','doc-backlink');a.textContent=list.length===1?'↩ Return to text':'↩ Return '+(i+1);p.appendChild(a);p.appendChild(doc.createTextNode(' '));});
-      if(list.length) el.appendChild(p);
+
     });
     return {notes:notes.size,references:Array.from(refs.values()).reduce((n,a)=>n+a.length,0),subscripts:root.querySelectorAll('sub').length,superscripts:root.querySelectorAll('sup').length};
   }
@@ -358,7 +356,7 @@
     if(year!==null)dateBody+='</ul>';
     return [{file:'categories.xhtml',title:'By Category',headings:headings,body:category},{file:'dates.xhtml',title:'By Date',headings:years,body:dateBody}];
   }
-  function directoryBook(source,articles,options){return packageBook('All Essays — 1000-Word Philosophy',directoryChapters(source,articles,options),[],'1000-Word Philosophy','essay-directory');}
+  function directoryBook(source,articles,options){return packageBook('All Papers — 1000-Word Philosophy',directoryChapters(source,articles,options),[],'1000-Word Philosophy','essay-directory');}
   function readLedger(raw){
     if(!raw)return{format:'philosophy-pocket-library',version:1,articles:{}};
     let value;try{value=JSON.parse(raw);}catch(_){throw new Error('philosophy-library.txt is not valid. Restore it from your sync backup before scraping.');}
