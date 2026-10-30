@@ -42,7 +42,7 @@ public class MainActivity extends Activity {
         final String js="window.nativeResult("+id+","+(result==null?"null":result.toString())+","+(error==null?"null":JSONObject.quote(error))+");";
         runOnUiThread(()->web.evaluateJavascript(js,null));
     }
-    JSONObject folderInfo()throws Exception{return folder==null?null:new JSONObject().put("label",folder.startsWith("content:")?Uri.decode(DocumentsContract.getTreeDocumentId(Uri.parse(folder))):folder);}
+    JSONObject folderInfo()throws Exception{if(folder==null)return null;JSONObject info=new JSONObject().put("label",folder.startsWith("content:")?Uri.decode(DocumentsContract.getTreeDocumentId(Uri.parse(folder))):folder);if(!folder.startsWith("content:"))info.put("baseURI",Uri.fromFile(new File(folder)).toString()+"/");return info;}
     class Bridge{
         @JavascriptInterface public void postMessage(String raw){
             try{JSONObject message=new JSONObject(raw);final int id=message.getInt("id");final String action=message.getString("action");final JSONObject args=message.optJSONObject("args");
@@ -78,13 +78,13 @@ public class MainActivity extends Activity {
     }
     byte[] readAll(InputStream stream)throws Exception{if(stream==null)throw new IOException("Could not open file");try(InputStream in=stream;ByteArrayOutputStream out=new ByteArrayOutputStream()){byte[] buffer=new byte[16384];int n;while((n=in.read(buffer))!=-1){out.write(buffer,0,n);if(out.size()>20000000)throw new IOException("File exceeds 20 MB limit");}return out.toByteArray();}}
     JSONObject library()throws Exception{
-        if(folder==null)throw new IOException("Choose a folder first");JSONArray names=new JSONArray();String ledger="";
-        if(folder.startsWith("content:")){Map<String,Uri> docs=documents();for(String name:docs.keySet())names.put(name);Uri record=docs.get("philosophy-library.txt");if(record==null)record=docs.get("philosophy-library.backup.txt");if(record!=null)ledger=new String(readAll(getContentResolver().openInputStream(record)),StandardCharsets.UTF_8);}
+        if(folder==null)throw new IOException("Choose a folder first");JSONArray names=new JSONArray();JSONObject fileURLs=new JSONObject();String ledger="";
+        if(folder.startsWith("content:")){Map<String,Uri> docs=documents();for(String name:docs.keySet()){names.put(name);if(name.endsWith(".epub"))fileURLs.put(name,docs.get(name).toString());}Uri record=docs.get("philosophy-library.txt");if(record==null)record=docs.get("philosophy-library.backup.txt");if(record!=null)ledger=new String(readAll(getContentResolver().openInputStream(record)),StandardCharsets.UTF_8);}
         else{File root=new File(folder);String[] files=root.list();if(files==null)throw new IOException("Folder is unavailable. Choose it again.");for(String name:files)names.put(name);File file=new File(root,"philosophy-library.txt");if(!file.exists())file=new File(root,"philosophy-library.backup.txt");if(file.exists())ledger=new String(readAll(new FileInputStream(file)),StandardCharsets.UTF_8);}
-        return new JSONObject().put("files",names).put("ledger",ledger);
+        return new JSONObject().put("files",names).put("ledger",ledger).put("fileURLs",fileURLs);
     }
     void write(JSONObject args)throws Exception{
-        if(folder==null)throw new IOException("Choose a folder first");String name=args.getString("name");if(name.contains("/")||name.contains("\\")||name.startsWith(".")||!(name.endsWith(".epub")||name.equals("philosophy-library.txt")))throw new IOException("Invalid output file");
+        if(folder==null)throw new IOException("Choose a folder first");String name=args.getString("name");if(name.contains("/")||name.contains("\\")||name.startsWith(".")||!(name.endsWith(".epub")||name.equals("philosophy-library.txt")||name.equals("All Essays.html")))throw new IOException("Invalid output file");
         byte[] data=args.has("base64")?android.util.Base64.decode(args.getString("base64"),android.util.Base64.DEFAULT):args.getString("text").getBytes(StandardCharsets.UTF_8);
         boolean replace=args.optBoolean("replace");
         if(folder.startsWith("content:")){
@@ -92,7 +92,7 @@ public class MainActivity extends Activity {
             Uri tree=Uri.parse(folder),parent=DocumentsContract.buildDocumentUriUsingTree(tree,DocumentsContract.getTreeDocumentId(tree));
             if(name.equals("philosophy-library.txt")&&docs.containsKey(name)){byte[] old=readAll(getContentResolver().openInputStream(docs.get(name)));Uri backup=docs.get("philosophy-library.backup.txt");if(backup==null)backup=DocumentsContract.createDocument(getContentResolver(),parent,"text/plain","philosophy-library.backup.txt");try(OutputStream out=getContentResolver().openOutputStream(backup,"wt")){if(out==null)throw new IOException("Cannot write backup");out.write(old);}}
             // Stage a complete file before replacing the destination. The old ledger is backed up first.
-            Uri temporary=DocumentsContract.createDocument(getContentResolver(),parent,name.endsWith(".epub")?"application/epub+zip":"text/plain",name+".partial");if(temporary==null)throw new IOException("Cannot create output file");
+            Uri temporary=DocumentsContract.createDocument(getContentResolver(),parent,name.endsWith(".epub")?"application/epub+zip":name.endsWith(".html")?"text/html":"text/plain",name+".partial");if(temporary==null)throw new IOException("Cannot create output file");
             try{try(OutputStream out=getContentResolver().openOutputStream(temporary,"wt")){if(out==null)throw new IOException("Cannot write output file");out.write(data);out.flush();}if(docs.containsKey(name))DocumentsContract.deleteDocument(getContentResolver(),docs.get(name));if(DocumentsContract.renameDocument(getContentResolver(),temporary,name)==null)throw new IOException("The file provider could not finish saving. The .partial file contains the completed data.");}catch(Exception e){throw e;}
         }else{
             File destination=new File(folder,name);if(destination.exists()&&!replace)return;

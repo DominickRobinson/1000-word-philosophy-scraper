@@ -4,7 +4,8 @@ import json,os,pathlib,secrets,subprocess,sys,zipfile
 ROOT=pathlib.Path(__file__).resolve().parent
 BUILD=pathlib.Path(os.environ.get('POCKET_BUILD',str(ROOT/'.build')))
 OUT=pathlib.Path(os.environ.get('POCKET_OUTPUT',str(ROOT/'dist')))
-VERSION=os.environ.get('APP_VERSION',json.loads((ROOT/'package.json').read_text())['version']).removeprefix('v')
+PACKAGE=json.loads((ROOT/'package.json').read_text())
+VERSION=os.environ.get('APP_VERSION',PACKAGE['version']).removeprefix('v')
 BUILD.mkdir(parents=True,exist_ok=True);OUT.mkdir(parents=True,exist_ok=True)
 def run(*args):subprocess.run([str(a) for a in args],check=True)
 def android():
@@ -12,7 +13,7 @@ def android():
     tools=sdk/'build-tools'/'35.0.0';jar=sdk/'platforms'/'android-35'/'android.jar'
     folder=BUILD/'android';classes=folder/'classes';dex=folder/'dex';classes.mkdir(parents=True,exist_ok=True);dex.mkdir(exist_ok=True)
     unsigned=folder/'unsigned.apk';aligned=folder/'aligned.apk'
-    manifest=(ROOT/'android/AndroidManifest.xml').read_text().replace('android:versionCode="1"','android:versionCode="2"').replace('android:versionName="1.0"','android:versionName="'+VERSION+'"')
+    manifest=(ROOT/'android/AndroidManifest.xml').read_text().replace('android:versionCode="1"','android:versionCode="'+str(PACKAGE['androidVersionCode'])+'"').replace('android:versionName="1.0"','android:versionName="'+VERSION+'"')
     manifest_path=folder/'AndroidManifest.xml';manifest_path.write_text(manifest)
     run(tools/'aapt','package','-f','-M',manifest_path,'-S',ROOT/'android/res','-A',ROOT/'web','-I',jar,'-F',unsigned)
     run('javac','-source','8','-target','8','-classpath',jar,'-d',classes,*sorted((ROOT/'android/src').rglob('*.java')))

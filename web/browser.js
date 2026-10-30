@@ -4,7 +4,7 @@
   const allowed=new Set(['1000wordphilosophy.com','www.1000wordphilosophy.com','i0.wp.com','i1.wp.com','i2.wp.com','1000wordphilosophy.files.wordpress.com']);
   let directory=null,imports=new Map(),writes=new Map(),label=null,mode=null,wake=null,lastRequest=0,chain=Promise.resolve();
   const cache=new Map();
-  function safeName(name){if(typeof name!=='string'||name.includes('/')||name.includes('\\')||name.startsWith('.')||!(name.endsWith('.epub')||name==='philosophy-library.txt'||name==='philosophy-library.backup.txt'))throw new Error('Invalid output filename.');return name;}
+  function safeName(name){if(typeof name!=='string'||name.includes('/')||name.includes('\\')||name.startsWith('.')||!(name.endsWith('.epub')||name==='philosophy-library.txt'||name==='philosophy-library.backup.txt'||name==='All Essays.html'))throw new Error('Invalid output filename.');return name;}
   function decode(s){const raw=atob(s),out=new Uint8Array(raw.length);for(let i=0;i<raw.length;i++)out[i]=raw.charCodeAt(i);return out;}
   function encode(bytes){let raw='';for(let i=0;i<bytes.length;i+=16384)raw+=String.fromCharCode.apply(null,bytes.subarray(i,i+16384));return btoa(raw);}
   async function read(name){

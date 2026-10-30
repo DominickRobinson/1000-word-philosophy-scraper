@@ -4,6 +4,7 @@
   const SITE = 'https://1000wordphilosophy.com';
   const XHTML = 'http://www.w3.org/1999/xhtml';
   const EPUB = 'http://www.idpf.org/2007/ops';
+  const IMAGE_MAX_EDGE=1600;
   const text = el => (el.textContent || '').replace(/\s+/g, ' ').trim();
   const escape = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   function normalize(url, base) {
@@ -16,7 +17,13 @@
   }
   function key(url) { return new URL(normalize(url)).pathname.split('/').filter(Boolean).pop() || 'home'; }
   function dateOf(url) { const m = url.match(/\/(\d{4}\/\d{2}\/\d{2})\//); return m ? m[1].replace(/\//g, '-') : ''; }
-  function filename(article) { return (article.date ? article.date + ' - ' : '') + key(article.url).replace(/[^a-zA-Z0-9_-]/g, '-').slice(0,140) + '.epub'; }
+  function legacyFilename(article,id) { return (article.date ? article.date + ' - ' : '') + (id||key(article.url)).replace(/[^a-zA-Z0-9_-]/g, '-').slice(0,140) + '.epub'; }
+  function filename(article) {
+    let name=(article.title||key(article.url)).normalize('NFC').replace(/:/g,' —').replace(/[<>"/\\|?*\x00-\x1f]/g,'').replace(/\s+/g,' ').replace(/^[. ]+|[. ]+$/g,'')||'Untitled essay';
+    if(/^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/i.test(name))name='_'+name;
+    const chars=Array.from(name);while(new TextEncoder().encode(chars.join('')).length>220)chars.pop();
+    return chars.join('').replace(/[. ]+$/g,'')+'.epub';
+  }
   function parse(source) { return new DOMParser().parseFromString(source, 'text/html'); }
   function content(doc) { const el = doc.querySelector('.entry-content'); if (!el) throw new Error('Article content was not found. The website may have changed.'); return el; }
   function discover(indexHTML, sitemapXML, feedXML) {
@@ -79,8 +86,42 @@
       try { const u = new URL(href,url); if (!['http:','https:','mailto:'].includes(u.protocol)) a.removeAttribute('href'); else a.setAttribute('href',u.href); } catch (_) { a.removeAttribute('href'); }
     });
     root.querySelectorAll('img').forEach(img => {
-      const src=img.getAttribute('data-orig-file') || img.getAttribute('data-src') || img.getAttribute('src');
-      if (src) { try { img.setAttribute('src',new URL(src,url).href); } catch (_) {img.remove();} } else img.remove();
+      // Prefer the reading-sized image; originals can exceed tens of megabytes.
+      const src=img.getAttribute('data-large-file') || img.getAttribute('data-src') || img.getAttribute('src') || img.getAttribute('data-orig-file');
+      if (src) { try { img.setAttribute('src',readingImageURL(new URL(src,url).href)); } catch (_) {img.remove();} } else img.remove();
+    });
+  }
+  function readingImageURL(source){
+    const u=new URL(source);
+    if(/^i[012]\.wp\.com$/.test(u.hostname)){
+      ['resize','w','h','fit','zoom'].forEach(key=>u.searchParams.delete(key));
+      u.searchParams.set('fit',IMAGE_MAX_EDGE+','+IMAGE_MAX_EDGE);
+    }
+    return u.href;
+  }
+  async function readingImage(bytes){
+    let type,ext;
+    if(bytes[0]===0x89&&bytes[1]===0x50){type='image/png';ext='png';}
+    else if(bytes[0]===0xff&&bytes[1]===0xd8){type='image/jpeg';ext='jpg';}
+    else if(bytes[0]===0x47&&bytes[1]===0x49){type='image/gif';ext='gif';}
+    else if(bytes[0]===0x52&&bytes[1]===0x49&&bytes[8]===0x57&&bytes[9]===0x45){type='image/webp';ext='webp';}
+    else throw new Error('Unsupported image format');
+    let binary='';for(let k=0;k<bytes.length;k+=16384)binary+=String.fromCharCode.apply(null,bytes.subarray(k,k+16384));
+    return new Promise((resolve,reject)=>{
+      const image=new Image(),timer=setTimeout(()=>reject(new Error('Image decoding timed out')),30000);
+      image.onload=()=>{clearTimeout(timer);try{
+        const width=image.naturalWidth||image.width,height=image.naturalHeight||image.height;
+        if(!width||!height)throw new Error('Invalid image dimensions');
+        const scale=Math.min(1,IMAGE_MAX_EDGE/Math.max(width,height));
+        if(scale===1&&ext!=='webp'){resolve({data:bytes,type:type,ext:ext,width:width,height:height});return;}
+        const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(width*scale));canvas.height=Math.max(1,Math.round(height*scale));
+        canvas.getContext('2d').drawImage(image,0,0,canvas.width,canvas.height);
+        // Keep lossless diagrams/transparency; photos use JPEG. Resized GIFs use a still PNG.
+        const outputType=type==='image/jpeg'?'image/jpeg':'image/png',raw=atob(canvas.toDataURL(outputType,0.85).split(',')[1]);
+        const data=new Uint8Array(raw.length);for(let k=0;k<raw.length;k++)data[k]=raw.charCodeAt(k);
+        resolve({data:data,type:outputType,ext:outputType==='image/jpeg'?'jpg':'png',width:canvas.width,height:canvas.height});
+      }catch(e){reject(e);}};
+      image.onerror=()=>{clearTimeout(timer);reject(new Error('Could not decode image'));};image.src='data:'+type+';base64,'+btoa(binary);
     });
   }
   const SKIP = /^(related essays?|related articles?|pdf( download)?|download( this essay)?|about the authors?|translations?|audio|video|acknowledg(e)?ments?|share this|follow 1000|discover more|subscribe)\b/i;
@@ -105,6 +146,9 @@
       }
       if (skipping || /^(Follow 1000-Word|If you found this useful|Download this essay|This essay is also available (as|in)|Listen to this essay|Loading Comments)/i.test(value)) el.remove();
     });
+    if (/^This essay is (?:currently |temporarily )?(?:unavailable|not available)\b/i.test(text(root))) {
+      const error=new Error('The website has withdrawn this essay for an update. It will be checked again when the source changes.');error.code='ARTICLE_UNAVAILABLE';throw error;
+    }
     if (text(root).length < 300) throw new Error('The extracted article is unexpectedly short.');
     const stats=repairNotes(root,warnings,canonicalURL);
     // Named anchors are not portable XHTML IDs; normalize and deduplicate all remaining IDs.
@@ -267,36 +311,72 @@
       if(!fetchImage){img.remove();continue;}
       try{
         const res=await fetchImage(img.getAttribute('src'));
-        let b=res.data;let ext,type;
-        if(b[0]===0x89&&b[1]===0x50){ext='png';type='image/png';}
-        else if(b[0]===0xff&&b[1]===0xd8){ext='jpg';type='image/jpeg';}
-        else if(b[0]===0x47&&b[1]===0x49){ext='gif';type='image/gif';}
-        else if(b[0]===0x52&&b[1]===0x49&&b[8]===0x57&&b[9]===0x45){
-          // EPUB's core image types do not include WebP. Convert it locally, without a server.
-          let binary='';for(let k=0;k<b.length;k+=16384)binary+=String.fromCharCode.apply(null,b.subarray(k,k+16384));
-          b=await new Promise((resolve,reject)=>{const image=new Image();image.onload=()=>{try{const canvas=document.createElement('canvas');const scale=Math.min(1,2400/Math.max(image.width,image.height));canvas.width=Math.max(1,Math.round(image.width*scale));canvas.height=Math.max(1,Math.round(image.height*scale));canvas.getContext('2d').drawImage(image,0,0,canvas.width,canvas.height);const s=atob(canvas.toDataURL('image/png').split(',')[1]),out=new Uint8Array(s.length);for(let k=0;k<s.length;k++)out[k]=s.charCodeAt(k);resolve(out);}catch(e){reject(e);}};image.onerror=()=>reject(new Error('Could not decode WebP image'));image.src='data:image/webp;base64,'+btoa(binary);});
-          ext='png';type='image/png';
-        } else throw new Error('Unsupported image format');
+        const prepared=await readingImage(res.data),b=prepared.data,ext=prepared.ext,type=prepared.type;
         const name='images/image-'+i+'.'+ext;assets.push({name:name,type:type,data:b});img.setAttribute('src',name);
       }catch(e){const p=article.root.ownerDocument.createElement('p');p.textContent='[Image: '+(img.getAttribute('alt')||'see original essay')+']';img.replaceWith(p);article.warnings.push('Image omitted: '+e.message);}
     }
     const body='<h1>'+escape(article.title)+'</h1>'+(article.author?'<p class="byline">By '+escape(article.author)+'</p>':'')+serialize(article.root)+'<p class="source">Original essay: <a href="'+escape(article.url)+'">1000-Word Philosophy</a>.</p>';
     return packageBook(article.title,[{file:'essay.xhtml',title:article.title,headings:article.headings,body:body}],assets,article.author,key(article.url));
   }
-  function directoryBook(source){
+  function libraryFilename(ledger,article,files){
+    for(const id of identities(article)){
+      const record=ledger&&ledger.articles&&ledger.articles[id];
+      if(record&&typeof record.file==='string'&&!/[\\/\x00-\x1f]/.test(record.file)&&record.file.endsWith('.epub'))return record.file;
+    }
+    const name=filename(article);if((files||[]).includes(name))return name;
+    for(const id of identities(article)){const old=legacyFilename(article,id);if((files||[]).includes(old))return old;}
+    return name;
+  }
+  function directoryChapters(source,articles,options){
+    options=options||{};articles=articles||discover(source);const ledger=options.ledger,files=options.files||[],byId=new Map();
+    articles.forEach(a=>identities(a).forEach(id=>byId.set(id,a)));
+    function links(article,label){
+      const name=libraryFilename(ledger,article,files),unavailable=ledger&&isUnavailable(ledger,article);
+      const saved=!ledger||isSaved(ledger,article,files);
+      let local=!unavailable&&saved&&(options.fileURLs||{})[name];
+      if(!local&&!unavailable&&saved&&options.baseURI&&options.baseURI.startsWith('file:///'))local=options.baseURI.replace(/\/?$/,'/')+encodeURIComponent(name);
+      if(options.html&&!unavailable&&saved)local=encodeURIComponent(name);
+      const href=local||article.url;
+      return '<a href="'+escape(href)+'">'+escape(label||article.title)+'</a>'+(local?' <small>(<a href="'+escape(article.url)+'">website</a>)</small>':'')+(unavailable?' <small>— currently unavailable</small>':'');
+    }
     const doc=parse(source),root=content(doc).cloneNode(true);cleanBase(root,SITE+'/all-essays/');
     Array.from(root.children).forEach(el=>{if(/^(Follow 1000|If you found|Discover more|Subscribe)/i.test(text(el)))el.remove();});
     root.querySelectorAll('img').forEach(el=>el.remove());
-    const headings=[];root.querySelectorAll('h2,h3,h4').forEach((h,i)=>{h.id='topic-'+i;headings.push({title:text(h),id:h.id});});
-    const body='<h1>All Essays</h1><p>A topic guide to 1000-Word Philosophy. Essay links open the original website.</p>'+serialize(root)+'<p class="source">Source: <a href="'+SITE+'/all-essays/">All Essays</a>. Retrieved '+new Date().toISOString().slice(0,10)+'.</p>';
-    return packageBook('1000-Word Philosophy — All Essays',[{file:'directory.xhtml',title:'Essay directory',headings:headings,body:body}],[],'1000-Word Philosophy','essay-directory');
+    root.querySelectorAll('a[name]').forEach(a=>{if(!a.id)a.id=a.getAttribute('name');a.removeAttribute('name');});
+    const headings=[];root.querySelectorAll('h2,h3,h4').forEach((h,i)=>{if(!h.id)h.id='topic-'+i;headings.push({title:text(h),id:h.id});});
+    root.querySelectorAll('a[href]').forEach(a=>{
+      const href=a.getAttribute('href');let u;try{u=new URL(href,SITE);}catch(_){return;}
+      if(u.hostname.replace(/^www\./,'')!=='1000wordphilosophy.com')return;
+      if(u.pathname==='/all-essays/'&&u.hash){
+        if(Array.from(root.querySelectorAll('[id]')).some(e=>e.id===decodeURIComponent(u.hash.slice(1))))a.setAttribute('href',u.hash);
+        return;
+      }
+      const article=byId.get(key(href));if(article){const span=doc.createElement('span');span.innerHTML=links(article,text(a));a.replaceWith(...Array.from(span.childNodes));}
+    });
+    const note=options.html?'Keep this index beside your EPUBs. Article titles open local files; website links are fallbacks.':'Article titles open downloaded EPUBs when a local file location is available and the reader supports it; otherwise they open the website. The companion HTML index links to neighboring EPUB files.';
+    const category='<h1 id="by-category">By Category</h1><p>'+note+'</p>'+serialize(root);
+    const years=[];let dateBody='<h1 id="by-date">By Date</h1>',year=null;
+    articles.slice().sort((a,b)=>b.date.localeCompare(a.date)||a.title.localeCompare(b.title)).forEach(article=>{
+      const y=article.date.slice(0,4)||'Undated';if(y!==year){if(year!==null)dateBody+='</ul>';year=y;const id='year-'+y;years.push({title:y,id:id});dateBody+='<h2 id="'+id+'">'+y+'</h2><ul>';}
+      dateBody+='<li>'+links(article)+' <small>— '+escape(article.date||'Date unavailable')+'</small></li>';
+    });
+    if(year!==null)dateBody+='</ul>';
+    return [{file:'categories.xhtml',title:'By Category',headings:headings,body:category},{file:'dates.xhtml',title:'By Date',headings:years,body:dateBody}];
+  }
+  function directoryBook(source,articles,options){return packageBook('All Essays — 1000-Word Philosophy',directoryChapters(source,articles,options),[],'1000-Word Philosophy','essay-directory');}
+  function directoryHTML(source,articles,options){
+    const chapters=directoryChapters(source,articles,Object.assign({},options,{html:true}));
+    return '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>All Essays — 1000-Word Philosophy</title><style>'+CSS+'</style></head><body><h1>All Essays</h1><nav><a href="#by-category">By Category</a> · <a href="#by-date">By Date</a></nav>'+chapters.map(c=>c.body).join('')+'</body></html>';
   }
   function readLedger(raw){
     if(!raw)return{format:'philosophy-pocket-library',version:1,articles:{}};
     let value;try{value=JSON.parse(raw);}catch(_){throw new Error('philosophy-library.txt is not valid. Restore it from your sync backup before scraping.');}
     if(value.format!=='philosophy-pocket-library'||value.version!==1||!value.articles||typeof value.articles!=='object'||Array.isArray(value.articles))throw new Error('Unrecognized download history. It has been left untouched.');
+    if(value.unavailable&&(typeof value.unavailable!=='object'||Array.isArray(value.unavailable)))throw new Error('Unrecognized unavailable-essay history. It has been left untouched.');
     return value;
   }
-  function isSaved(ledger,article,files){return !!ledger.articles[article.id||key(article.url)] || (files||[]).includes(filename(article));}
-  global.Philosophy={SITE: SITE,normalize:normalize,key:key,filename:filename,discover:discover,extract:extract,articleBook:articleBook,directoryBook:directoryBook,readLedger:readLedger,isSaved:isSaved,serialize:serialize,zip:zip,zipBlob:zipBlob};
+  function identities(article){return Array.from(new Set([article.id||key(article.url)].concat(article.aliases||[])));}
+  function isSaved(ledger,article,files){return identities(article).some(id=>!!ledger.articles[id]||(files||[]).includes(legacyFilename(article,id)))||(files||[]).includes(filename(article));}
+  function isUnavailable(ledger,article){return !!article.modified&&identities(article).some(id=>ledger.unavailable&&ledger.unavailable[id]&&ledger.unavailable[id].modified===article.modified);}
+  global.Philosophy={SITE: SITE,normalize:normalize,key:key,filename:filename,discover:discover,extract:extract,articleBook:articleBook,directoryBook:directoryBook,directoryHTML:directoryHTML,readingImage:readingImage,libraryFilename:libraryFilename,readLedger:readLedger,isSaved:isSaved,isUnavailable:isUnavailable,serialize:serialize,zip:zip,zipBlob:zipBlob};
 })(window);

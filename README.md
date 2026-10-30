@@ -4,7 +4,7 @@ A small, e-ink-friendly tool with two buttons: **Choose folder** and **Download 
 
 **[Open the web app](https://dominickrobinson.github.io/1000-word-philosophy-scraper/)** · **[Download Android](https://github.com/DominickRobinson/1000-word-philosophy-scraper/releases/latest)**
 
-The app saves an EPUB for each essay from [1000-Word Philosophy](https://1000wordphilosophy.com/). It includes images, headings, the main text, notes, references, further reading and appendices. Numbered notes link back to the text; mathematical superscripts and subscripts are retained. Every EPUB has a table of contents. Website menus, related-essay recommendations, subscription forms and author biographies are removed.
+The app reads the All Essays directory and public WordPress metadata to resolve outdated links and include newly published essays. It saves an EPUB for each essay from [1000-Word Philosophy](https://1000wordphilosophy.com/). It includes images, headings, the main text, notes, references, further reading and appendices. Numbered notes link back to the text; mathematical superscripts and subscripts are retained. Every EPUB has a table of contents. Website menus, related-essay recommendations, subscription forms and author biographies are removed.
 
 ## Use
 
@@ -45,9 +45,19 @@ Mac, Windows and Linux use the web version. A native iOS build is deferred; iOS 
 
 - The TXT file is read before every essay fetch and merged immediately before a successful save.
 - An existing record skips an essay even if the EPUB has not yet synced to this device. An existing EPUB with the expected filename is also skipped.
-- Failed downloads and missing images are not marked as complete. Malformed history stops the run instead of discarding the record.
+- Failed article downloads are not marked as complete. Images are capped at 1,600 pixels on the longest edge with proportions preserved; small images are never enlarged. Broken, unsupported or oversized images are omitted with a warning; the readable essay is still saved. Malformed history stops the run instead of discarding the record.
 - Sync the EPUBs and TXT files together. Let sync finish before changing devices, and run downloads on one device at a time. The app does not supply a cloud-sync service or a cross-device lock.
 - Previously saved essays are not refreshed when the website edits them. Choose a genuinely empty directory to build a fresh collection.
+
+## Filenames and master index
+
+New EPUB filenames use article titles without date prefixes. Filesystem-reserved characters are removed or replaced. Existing dated filenames and synced TXT records are still recognized; existing files are not renamed or fetched again.
+
+Every run refreshes **All Essays.epub**, with **By Category** and **By Date** sections in its table of contents, plus **All Essays.html**. The HTML index uses relative links to the corresponding downloaded EPUBs and works best when opened locally beside the files. It uses actual filenames from the TXT history, including older dated filenames.
+
+EPUB does not provide portable links to neighboring EPUB files. The Android app can put known file locations in the master EPUB; opening those links depends on the reader and paths break if the folder moves. Web-generated master EPUBs use website links because browsers do not reveal the folder's full path. Website fallbacks are included. Supernote support for cross-file EPUB links has not been verified.
+
+An explicit withdrawal notice, such as The Problem of Induction, is recorded under `unavailable` in the same TXT file. The app checks it again when the website's modification date changes, rather than repeatedly downloading the unchanged notice.
 
 ## Builds and releases
 
