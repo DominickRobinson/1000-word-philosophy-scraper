@@ -20,7 +20,7 @@
     $('folderName').textContent=state.folder?state.folder.label:'No folder selected';$('chooseFolder').disabled=state.busy;$('download').disabled=!state.folder||state.stop;
     $('download').textContent=state.busy?(state.stop?'Stopping…':'Stop after this article'):(state.exportPending?'Save ZIP':'Download new articles');
   }
-  async function loadLibrary(){if(!state.folder)return;const info=await native('library');state.files=info.files;state.ledger=P.readLedger(info.ledger);state.fileURLs=info.fileURLs||{};}
+  async function loadLibrary(){if(!state.folder)return;const info=await native('library');state.files=info.files;state.ledger=P.readLedger(info.ledger);}
   function saved(a){return P.isSaved(state.ledger,a,state.files);}
   async function get(url,fresh,binary){
     let last;for(let attempt=0;attempt<3;attempt++){
@@ -83,9 +83,8 @@
     }catch(e){progress(complete,total,'Could not finish.',e.message);showError(e.message);}
     finally{
       if(directorySource&&state.articles.length){try{
-        await loadLibrary();const options={ledger:state.ledger,files:state.files,fileURLs:state.fileURLs,baseURI:state.folder.baseURI};
+        await loadLibrary();const options={ledger:state.ledger,files:state.files};
         await native('write',{name:'All Essays.epub',base64:b64(P.directoryBook(directorySource,state.articles,options)),replace:true});
-        await native('write',{name:'All Essays.html',text:P.directoryHTML(directorySource,state.articles,options),replace:true});
       }catch(e){showError('Could not save the master index: '+e.message);}}
       if(window.browserNative){const finished=await native('finishRun');state.exportPending=!!finished.exportPending;if(state.exportPending){$('status').textContent='Ready to save.';$('detail').textContent='Save the ZIP, then extract it into your library folder.';}}if(state.stop)progress(complete,total,'Stopped.',downloaded+' downloaded');await native('keepAwake',{on:false}).catch(()=>{});state.busy=false;state.stop=false;render();}
   }

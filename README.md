@@ -53,9 +53,7 @@ Mac, Windows and Linux use the web version. A native iOS build is deferred; iOS 
 
 New EPUB filenames use article titles without date prefixes. Filesystem-reserved characters are removed or replaced. Existing dated filenames and synced TXT records are still recognized; existing files are not renamed or fetched again.
 
-Every run refreshes **All Essays.epub**, with **By Category** and **By Date** sections in its table of contents, plus **All Essays.html**. The HTML index uses relative links to the corresponding downloaded EPUBs and works best when opened locally beside the files. It uses actual filenames from the TXT history, including older dated filenames.
-
-EPUB does not provide portable links to neighboring EPUB files. The Android app can put known file locations in the master EPUB; opening those links depends on the reader and paths break if the folder moves. Web-generated master EPUBs use website links because browsers do not reveal the folder's full path. Website fallbacks are included. Supernote support for cross-file EPUB links has not been verified.
+Every run refreshes **All Essays.epub**, with **By Category** and **By Date** sections in its table of contents. Article titles link to the original website; find downloaded essays by their title-only filenames. There are no cross-file local links.
 
 An explicit withdrawal notice, such as The Problem of Induction, is recorded under `unavailable` in the same TXT file. The app checks it again when the website's modification date changes, rather than repeatedly downloading the unchanged notice.
 

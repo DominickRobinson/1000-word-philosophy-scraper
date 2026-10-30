@@ -14,10 +14,9 @@ The Android APK is available in Releases. Mac, Windows and Linux use the
 web app. Native iOS is deferred; iOS browsers can use ZIP export.
 
 New essay filenames contain titles only, without date prefixes. Existing
-downloads are still recognized. Each run refreshes All Essays.epub (By
-Category and By Date) and All Essays.html. The HTML index links to nearby
-EPUB files; direct links inside an EPUB depend on reader support and known
-file locations. Website links are included as a fallback.
+downloads are still recognized. Each run refreshes All Essays.epub with
+By Category and By Date sections. Titles link to the original website;
+find downloaded essays by searching for their titles.
 
 README.md contains installation, development, signing and workflow details.
 No private signing credentials or downloaded essay collection belong in Git.

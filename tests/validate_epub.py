@@ -16,6 +16,7 @@ for file in files:
                 link=a.get('href') or a.get('src')
                 if not link:continue
                 u=urllib.parse.urlsplit(link)
+                assert u.scheme not in ('file','content'),(name,link,'non-portable local file URI')
                 if u.scheme:continue
                 dest=posixpath.normpath(posixpath.join(posixpath.dirname(name),u.path)) if u.path else name
                 assert dest in z.namelist(),(name,link,'missing file')
@@ -33,5 +34,5 @@ with zipfile.ZipFile(folder/'portable-library.zip') as z:
     ledger=json.loads(z.read('philosophy-library.txt'))
     assert len(ledger['articles'])==3
     assert len([n for n in z.namelist() if n.endswith('.epub') and n!='All Essays.epub'])==2
-    assert 'All Essays.epub' in z.namelist() and 'All Essays.html' in z.namelist()
+    assert 'All Essays.epub' in z.namelist()
 print('PASS: EPUB containers, XML, manifest resources, all local targets, images, citation return links, and portable ZIP history.')

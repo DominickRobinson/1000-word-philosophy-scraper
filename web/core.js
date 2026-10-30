@@ -331,13 +331,8 @@
     options=options||{};articles=articles||discover(source);const ledger=options.ledger,files=options.files||[],byId=new Map();
     articles.forEach(a=>identities(a).forEach(id=>byId.set(id,a)));
     function links(article,label){
-      const name=libraryFilename(ledger,article,files),unavailable=ledger&&isUnavailable(ledger,article);
-      const saved=!ledger||isSaved(ledger,article,files);
-      let local=!unavailable&&saved&&(options.fileURLs||{})[name];
-      if(!local&&!unavailable&&saved&&options.baseURI&&options.baseURI.startsWith('file:///'))local=options.baseURI.replace(/\/?$/,'/')+encodeURIComponent(name);
-      if(options.html&&!unavailable&&saved)local=encodeURIComponent(name);
-      const href=local||article.url;
-      return '<a href="'+escape(href)+'">'+escape(label||article.title)+'</a>'+(local?' <small>(<a href="'+escape(article.url)+'">website</a>)</small>':'')+(unavailable?' <small>— currently unavailable</small>':'');
+      const unavailable=ledger&&isUnavailable(ledger,article);
+      return '<a href="'+escape(article.url)+'">'+escape(label||article.title)+'</a>'+(unavailable?' <small>— currently unavailable</small>':'');
     }
     const doc=parse(source),root=content(doc).cloneNode(true);cleanBase(root,SITE+'/all-essays/');
     Array.from(root.children).forEach(el=>{if(/^(Follow 1000|If you found|Discover more|Subscribe)/i.test(text(el)))el.remove();});
@@ -353,7 +348,7 @@
       }
       const article=byId.get(key(href));if(article){const span=doc.createElement('span');span.innerHTML=links(article,text(a));a.replaceWith(...Array.from(span.childNodes));}
     });
-    const note=options.html?'Keep this index beside your EPUBs. Article titles open local files; website links are fallbacks.':'Article titles open downloaded EPUBs when a local file location is available and the reader supports it; otherwise they open the website. The companion HTML index links to neighboring EPUB files.';
+    const note='Article titles open the original website. Downloaded EPUBs use article titles as filenames.';
     const category='<h1 id="by-category">By Category</h1><p>'+note+'</p>'+serialize(root);
     const years=[];let dateBody='<h1 id="by-date">By Date</h1>',year=null;
     articles.slice().sort((a,b)=>b.date.localeCompare(a.date)||a.title.localeCompare(b.title)).forEach(article=>{
@@ -364,10 +359,6 @@
     return [{file:'categories.xhtml',title:'By Category',headings:headings,body:category},{file:'dates.xhtml',title:'By Date',headings:years,body:dateBody}];
   }
   function directoryBook(source,articles,options){return packageBook('All Essays — 1000-Word Philosophy',directoryChapters(source,articles,options),[],'1000-Word Philosophy','essay-directory');}
-  function directoryHTML(source,articles,options){
-    const chapters=directoryChapters(source,articles,Object.assign({},options,{html:true}));
-    return '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>All Essays — 1000-Word Philosophy</title><style>'+CSS+'</style></head><body><h1>All Essays</h1><nav><a href="#by-category">By Category</a> · <a href="#by-date">By Date</a></nav>'+chapters.map(c=>c.body).join('')+'</body></html>';
-  }
   function readLedger(raw){
     if(!raw)return{format:'philosophy-pocket-library',version:1,articles:{}};
     let value;try{value=JSON.parse(raw);}catch(_){throw new Error('philosophy-library.txt is not valid. Restore it from your sync backup before scraping.');}
@@ -378,5 +369,5 @@
   function identities(article){return Array.from(new Set([article.id||key(article.url)].concat(article.aliases||[])));}
   function isSaved(ledger,article,files){return identities(article).some(id=>!!ledger.articles[id]||(files||[]).includes(legacyFilename(article,id)))||(files||[]).includes(filename(article));}
   function isUnavailable(ledger,article){return !!article.modified&&identities(article).some(id=>ledger.unavailable&&ledger.unavailable[id]&&ledger.unavailable[id].modified===article.modified);}
-  global.Philosophy={SITE: SITE,normalize:normalize,key:key,filename:filename,discover:discover,extract:extract,articleBook:articleBook,directoryBook:directoryBook,directoryHTML:directoryHTML,readingImage:readingImage,libraryFilename:libraryFilename,readLedger:readLedger,isSaved:isSaved,isUnavailable:isUnavailable,serialize:serialize,zip:zip,zipBlob:zipBlob};
+  global.Philosophy={SITE: SITE,normalize:normalize,key:key,filename:filename,discover:discover,extract:extract,articleBook:articleBook,directoryBook:directoryBook,readingImage:readingImage,libraryFilename:libraryFilename,readLedger:readLedger,isSaved:isSaved,isUnavailable:isUnavailable,serialize:serialize,zip:zip,zipBlob:zipBlob};
 })(window);

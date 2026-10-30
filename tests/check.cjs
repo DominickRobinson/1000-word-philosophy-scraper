@@ -72,10 +72,10 @@ async function clickDownload(page){await page.locator('#download').click();await
     };
   },{items:regPosts,index:regDirectory,png});
   await regression.goto(url);await clickDownload(regression);
-  let reg=await regression.evaluate(async()=>({ledger:JSON.parse(await testStore.get('philosophy-library.txt').text()),files:Array.from(testStore.keys()),requests:testRequests.slice(),html:await testStore.get('All Essays.html').text()}));
+  let reg=await regression.evaluate(async()=>({ledger:JSON.parse(await testStore.get('philosophy-library.txt').text()),files:Array.from(testStore.keys()),requests:testRequests.slice()}));
   assert.equal(Object.keys(reg.ledger.articles).length,2);assert.equal(reg.ledger.articles['sample-2'].warnings.length,1,'Image failure must still save the essay');assert(reg.ledger.unavailable['sample-3']);
   assert(reg.files.includes('Synthetic essay 1.epub'));assert(reg.files.includes('Synthetic essay 2.epub'));assert(!reg.requests.some(u=>u.includes('oversized-original')),'Prefer the reading-sized image');assert(reg.requests.some(u=>u.includes('/small.png?fit=1600%2C1600')));
-  assert(reg.html.includes('Synthetic%20essay%202.epub'));assert(reg.html.includes('By Category'));assert(reg.html.includes('By Date'));assert(reg.html.includes('2026-10-02'));assert(!reg.requests.some(u=>u.includes('old-sample-2')),'Resolve directory aliases using metadata');
+  assert(reg.files.includes('All Essays.epub'));assert(!reg.requests.some(u=>u.includes('old-sample-2')),'Resolve directory aliases using metadata');
   const regBefore=reg.requests.length;await clickDownload(regression);assert(!(await regression.evaluate(n=>testRequests.slice(n),regBefore)).some(u=>/\/posts\/\d+/.test(u)),'Do not refetch saved or unchanged unavailable essays');
   await regression.evaluate(newBody=>{testPosts[2].modified='2026-10-02T00:00:00';testPosts[2].content.rendered=newBody;},body);await clickDownload(regression);
   reg=await regression.evaluate(async()=>JSON.parse(await testStore.get('philosophy-library.txt').text()));assert(reg.articles['sample-3']);assert(!reg.unavailable['sample-3'],'A restored essay must be downloaded when modified');
