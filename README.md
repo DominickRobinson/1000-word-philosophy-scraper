@@ -4,12 +4,15 @@ A small, e-ink-friendly tool with two buttons: **Choose folder** and **Download 
 
 **[Open the web app](https://dominickrobinson.github.io/1000-word-philosophy-scraper/)** · **[Download Android](https://github.com/DominickRobinson/1000-word-philosophy-scraper/releases/latest)**
 
-The app reads the All Essays directory and public WordPress metadata to resolve outdated links and include newly published essays. It saves an EPUB for each essay from [1000-Word Philosophy](https://1000wordphilosophy.com/). It includes images, headings, the main text, notes, references, further reading and appendices. In-text citation markers use explicit in-book file paths to jump to their notes on Supernote; mathematical superscripts and subscripts are retained. Every EPUB has a table of contents. Website menus, related-essay recommendations, subscription forms and author biographies are removed.
+The app reads the All Essays directory and public WordPress metadata to resolve outdated links and include newly published essays. It saves an EPUB or the linked original PDF for each essay from [1000-Word Philosophy](https://1000wordphilosophy.com/). It includes images, headings, the main text, notes, references, further reading and appendices. In-text citation markers use explicit in-book file paths to jump to their notes on Supernote; mathematical superscripts and subscripts are retained. Every EPUB has a table of contents. Website menus, related-essay recommendations, subscription forms and author biographies are removed.
 
 ## Use
 
 1. Choose a folder.
-2. Press **Download new articles**.
+2. Set the **EPUB / PDF** toggle (EPUB is the default).
+3. Press **Download new articles**.
+
+PDF mode downloads the PDF linked in the essay, preserving its original layout. If no supported PDF link is available or it fails, the essay is reported as failed and remains retryable; select EPUB to download it as an ebook. The format is remembered on this device and cannot change during a download or pending ZIP export. PDF and EPUB history are tracked separately, so both formats can coexist in the same folder. The master index remains **All Papers.epub** in either mode.
 
 An empty folder starts the complete collection. A folder with existing progress downloads only missing essays. The button becomes **Stop after this article** while a download runs. Keep the app open until it finishes.
 
@@ -57,6 +60,7 @@ The selected folder contains:
 All Papers.epub
 papers/
   Article title.epub
+  Article title.pdf
 app-data/
   philosophy-library.txt
   philosophy-library.backup.txt

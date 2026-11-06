@@ -13,15 +13,16 @@
       else{clearTimeout(timer);pending.delete(id);reject(new Error('Open the installed app to save files.'));}
     });
   }
-  const state={folder:null,articles:[],ledger:P.readLedger(''),files:[],busy:false,stop:false,exportPending:false,errors:[],blocked:[]};
+  const state={folder:null,format:'epub',articles:[],ledger:P.readLedger(''),files:[],busy:false,stop:false,exportPending:false,errors:[],blocked:[]};
   function showError(message){state.errors.push(message);$('log').textContent=state.errors.join('\n');$('errorCount').textContent='Download details ('+state.errors.length+')';$('errors').hidden=false;}
   function progress(done,total,status,detail){$('status').textContent=status;$('count').textContent=total?done+' / '+total:'';$('detail').textContent=detail||'';const percent=total?Math.round(done/total*100):0;$('progressFill').style.width=percent+'%';document.querySelector('[role=progressbar]').setAttribute('aria-valuenow',String(percent));}
   function render(){
+    $('pdfFormat').disabled=state.busy||state.exportPending;$('pdfFormat').checked=state.format==='pdf';$('formatLabel').textContent=state.format.toUpperCase();
     $('folderName').textContent=state.folder?state.folder.label:'No folder selected';$('chooseFolder').disabled=state.busy;$('download').disabled=!state.folder||state.stop;
     $('download').textContent=state.busy?(state.stop?'Stopping…':'Stop after this article'):(state.exportPending?'Save ZIP':'Download new articles');
   }
   async function loadLibrary(){if(!state.folder)return;const info=await native('library');state.files=info.files;state.ledger=P.readLedger(info.ledger);}
-  function saved(a){return P.isSaved(state.ledger,a,state.files);}
+  function saved(a){return P.isSaved(state.ledger,a,state.files,state.format);}
   async function get(url,fresh,binary){
     let last;for(let attempt=0;attempt<3;attempt++){
       try{const r=await native('fetch',{url:url,fresh:!!fresh,binary:!!binary});if(r.status!==200)throw new Error('HTTP '+r.status+' for '+url);return r;}
@@ -39,8 +40,9 @@
   async function remember(article,name){
     const current=await native('library'),ledger=P.readLedger(current.ledger);
     const id=article.id||P.key(article.url);
-    ledger.articles[id]={url:article.url,title:article.title,file:name,savedAt:new Date().toISOString()};
-    if(article.warnings&&article.warnings.length)ledger.articles[id].warnings=article.warnings;
+    const records=state.format==='pdf'?(ledger.pdfArticles=ledger.pdfArticles||{}):ledger.articles;
+    records[id]={url:article.url,title:article.title,file:name,savedAt:new Date().toISOString()};
+    if(article.warnings&&article.warnings.length)records[id].warnings=article.warnings;
     if(ledger.unavailable)delete ledger.unavailable[id];ledger.updatedAt=new Date().toISOString();
     await native('write',{name:'philosophy-library.txt',text:JSON.stringify(ledger,null,2)+'\n',replace:true});state.ledger=ledger;state.files=current.files;if(!state.files.includes(name))state.files.push(name);
   }
@@ -65,11 +67,16 @@
         try{
           checkAllowed(item.postId?'/wp-json/wp/v2/posts/'+item.postId:'/wp-json/wp/v2/pages');
           const source=await window.PhilosophyAPI.article(get,item),article=P.extract(source.text,source.url||item.url);
-          if(P.isSaved(state.ledger,article,state.files)){await remember(item,P.libraryFilename(state.ledger,article,state.files));skipped++;}
+          if(P.isSaved(state.ledger,article,state.files,state.format)){await remember(item,P.libraryFilename(state.ledger,article,state.files,state.format));skipped++;}
           else{
-            const data=await P.articleBook(article,async url=>{const r=await get(url,false,true);return{data:bytes(r.base64)};});
+            let data;
+            if(state.format==='pdf'){
+              const url=P.pdfURL(source.text,source.url||item.url);if(new URL(url).hostname===new URL(P.SITE).hostname)checkAllowed(new URL(url).pathname);
+              data=bytes((await get(url,false,true)).base64);
+              if(new TextDecoder().decode(data.subarray(0,5))!=='%PDF-')throw new Error('The PDF link did not return a valid PDF file.');
+            }else data=await P.articleBook(article,async url=>{const r=await get(url,false,true);return{data:bytes(r.base64)};});
             // Image failures are warnings: keep the readable essay and its saved record.
-            const name=P.filename(article);await native('write',{name:name,base64:b64(data),replace:false});await remember(article,name);if(item.id!==P.key(article.url))await remember(item,name);downloaded++;
+            const name=P.filename(article,state.format);await native('write',{name:name,base64:b64(data),replace:false});await remember(article,name);if(item.id!==P.key(article.url))await remember(item,name);downloaded++;
             article.warnings.forEach(w=>showError(article.title+': '+w));
           }
         }catch(e){
@@ -88,7 +95,9 @@
       }catch(e){showError('Could not save the master index: '+e.message);}}
       if(window.browserNative){const finished=await native('finishRun');state.exportPending=!!finished.exportPending;if(state.exportPending){$('status').textContent='Ready to save.';$('detail').textContent='Save the ZIP, then extract it into your library folder.';}}if(state.stop)progress(complete,total,'Stopped.',downloaded+' downloaded');await native('keepAwake',{on:false}).catch(()=>{});state.busy=false;state.stop=false;render();}
   }
-  $('chooseFolder').onclick=async()=>{try{const folder=await native('chooseFolder');if(folder){state.folder=folder;state.exportPending=false;state.ledger=P.readLedger('');state.files=[];await loadLibrary();const n=Object.keys(state.ledger.articles).length;progress(0,0,n?'Ready.':'Ready to download the full collection.',n?n+' saved article records in this folder.':'');render();}}catch(e){showError(e.message);progress(0,0,'Could not read this folder.',e.message);render();}};
+  $('chooseFolder').onclick=async()=>{try{const folder=await native('chooseFolder');if(folder){state.folder=folder;state.exportPending=false;state.ledger=P.readLedger('');state.files=[];await loadLibrary();const n=Object.keys(state.ledger.articles).length+Object.keys(state.ledger.pdfArticles||{}).length;progress(0,0,n?'Ready.':'Ready to download the full collection.',n?n+' saved article records in this folder.':'');render();}}catch(e){showError(e.message);progress(0,0,'Could not read this folder.',e.message);render();}};
+  try{state.format=localStorage.getItem('downloadFormat')==='pdf'?'pdf':'epub';}catch(_){}
+  $('pdfFormat').onchange=()=>{if(state.busy||state.exportPending){render();return;}state.format=$('pdfFormat').checked?'pdf':'epub';try{localStorage.setItem('downloadFormat',state.format);}catch(_){}render();};
   $('download').onclick=run;
   native('settings').then(async result=>{state.folder=result.folder;if(state.folder){await loadLibrary();progress(0,0,'Ready.');}render();}).catch(e=>{showError(e.message);render();});
   window.PocketApp={state:state,run:run,native:native,render:render};render();

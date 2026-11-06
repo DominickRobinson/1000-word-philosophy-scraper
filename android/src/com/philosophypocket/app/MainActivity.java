@@ -107,7 +107,7 @@ public class MainActivity extends Activity {
         if(child==null&&create)throw new IOException("Cannot create "+sub);return child;
     }
     String outputFolder(String name){return name.equals("All Papers.epub")?"":name.endsWith(".txt")?"app-data":"papers";}
-    void validateName(String name)throws IOException{if(name.contains("/")||name.contains("\\")||name.startsWith(".")||!(name.endsWith(".epub")||name.equals("philosophy-library.txt")||name.equals("philosophy-library.backup.txt")))throw new IOException("Invalid output file");}
+    void validateName(String name)throws IOException{if(name.contains("/")||name.contains("\\")||name.startsWith(".")||!(name.endsWith(".epub")||name.endsWith(".pdf")||name.equals("philosophy-library.txt")||name.equals("philosophy-library.backup.txt")))throw new IOException("Invalid output file");}
     Set<String> names(String sub)throws Exception{
         if(folder.startsWith("content:")){Uri parent=parentUri(sub,false);return parent==null?new HashSet<>():new HashSet<>(documents(parent).keySet());}
         File dir=sub.isEmpty()?new File(folder):new File(folder,sub);String[] files=dir.list();if(files==null&&sub.isEmpty())throw new IOException("Folder is unavailable. Choose it again.");return files==null?new HashSet<>():new HashSet<>(Arrays.asList(files));
@@ -131,6 +131,7 @@ public class MainActivity extends Activity {
             JSONObject history=new JSONObject(ledger);if(!history.optString("format").equals("philosophy-pocket-library")||history.optInt("version")!=1)throw new IOException("Unrecognized download history");
             JSONObject articles=history.getJSONObject("articles");Iterator<String> keys=articles.keys();while(keys.hasNext()){String file=articles.getJSONObject(keys.next()).optString("file");if(!file.isEmpty())legacy.add(file);}
         }
+        if(!ledger.isEmpty()){JSONObject pdfs=new JSONObject(ledger).optJSONObject("pdfArticles");if(pdfs!=null){Iterator<String> keys=pdfs.keys();while(keys.hasNext()){String file=pdfs.getJSONObject(keys.next()).optString("file");if(!file.isEmpty())legacy.add(file);}}}
         legacy.add("philosophy-library.txt");legacy.add("philosophy-library.backup.txt");Set<String> rootNames=names("");
         for(String name:legacy){validateName(name);String target=outputFolder(name);if(!rootNames.contains(name)||names(target).contains(name))continue;byte[] old=readFile("",name);if(old!=null){writeFile(target,name,old,false);removeFile("",name);}}
         Set<String> all=names("");all.addAll(names("papers"));return new JSONObject().put("files",new JSONArray(all)).put("ledger",ledger);
@@ -145,7 +146,7 @@ public class MainActivity extends Activity {
     void writeFile(String sub,String name,byte[] data,boolean replace)throws Exception{
         if(folder.startsWith("content:")){
             Uri parent=parentUri(sub,true);Map<String,Uri> docs=documents(parent);if(docs.containsKey(name)&&!replace)return;
-            Uri temporary=DocumentsContract.createDocument(getContentResolver(),parent,name.endsWith(".epub")?"application/epub+zip":"text/plain",name+".partial");if(temporary==null)throw new IOException("Cannot create output file");
+            Uri temporary=DocumentsContract.createDocument(getContentResolver(),parent,name.endsWith(".epub")?"application/epub+zip":name.endsWith(".pdf")?"application/pdf":"text/plain",name+".partial");if(temporary==null)throw new IOException("Cannot create output file");
             try(OutputStream out=getContentResolver().openOutputStream(temporary,"wt")){if(out==null)throw new IOException("Cannot write output file");out.write(data);out.flush();}
             if(docs.containsKey(name))DocumentsContract.deleteDocument(getContentResolver(),docs.get(name));
             if(DocumentsContract.renameDocument(getContentResolver(),temporary,name)==null)throw new IOException("The file provider could not finish saving. The .partial file contains the completed data.");

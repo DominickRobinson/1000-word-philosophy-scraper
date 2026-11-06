@@ -2,7 +2,7 @@ const fs=require('fs'),path=require('path'),http=require('http'),assert=require(
 const {chromium}=require('playwright');
 const root=path.resolve(__dirname,'..'),out=path.join(root,'.build','tests');fs.rmSync(out,{recursive:true,force:true});fs.mkdirSync(out,{recursive:true});
 const png='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=';
-const body='<p>Author: Test Author<br>Category: Logic<br>Word Count: 1000</p><p>This original test passage contains enough text to exercise extraction without including any published essay. A numbered note<sup><a href="#_ftn1">[1]</a></sup> appears twice [1]. Mathematics stays intact: x<sup>2</sup>, S<sub>0</sub>, and H<sub>2</sub>O. This intentionally long sentence tests the content length guard and checks that the EPUB retains every character of the original synthetic prose.</p><figure><img src="https://i0.wp.com/1000wordphilosophy.com/test.png" alt="Synthetic test image"></figure><h3>Notes</h3><p><a name="_ftn1" href="#_ftnref1">[1]</a> A note with an italic <em>book title</em>.</p><p>A second paragraph in the same note.</p><h3>References</h3><p>Author. A book.</p><h3>Related Essays</h3><p>Remove this recommendation.</p><h3>Appendix</h3><p>Keep this appendix.</p><h3>About the Author</h3><p>Remove this biography.</p>';
+const body='<p><a href="https://1000wordphilosophy.files.wordpress.com/2026/10/test.pdf">Download PDF</a></p><p>Author: Test Author<br>Category: Logic<br>Word Count: 1000</p><p>This original test passage contains enough text to exercise extraction without including any published essay. A numbered note<sup><a href="#_ftn1">[1]</a></sup> appears twice [1]. Mathematics stays intact: x<sup>2</sup>, S<sub>0</sub>, and H<sub>2</sub>O. This intentionally long sentence tests the content length guard and checks that the EPUB retains every character of the original synthetic prose.</p><figure><img src="https://i0.wp.com/1000wordphilosophy.com/test.png" alt="Synthetic test image"></figure><h3>Notes</h3><p><a name="_ftn1" href="#_ftnref1">[1]</a> A note with an italic <em>book title</em>.</p><p>A second paragraph in the same note.</p><h3>References</h3><p>Author. A book.</p><h3>Related Essays</h3><p>Remove this recommendation.</p><h3>Appendix</h3><p>Keep this appendix.</p><h3>About the Author</h3><p>Remove this biography.</p>';
 const posts=[1,2,3].map(n=>({id:n,slug:'sample-'+n,date:'2026-10-0'+(4-n)+'T00:00:00',modified:'2026-10-01T00:00:00',link:'https://1000wordphilosophy.com/2026/10/0'+(4-n)+'/sample-'+n+'/',title:{rendered:'Synthetic essay '+n},content:{rendered:body,protected:false}}));
 const directory={id:100,link:'https://1000wordphilosophy.com/all-essays/',title:{rendered:'All Essays'},content:{rendered:'<h2 id="logic">Logic</h2><ul>'+posts.map(p=>'<li><a href="'+p.link+'">'+p.title.rendered+'</a> by Test Author</li>').join('')+'</ul>'}};
 const blank=()=>({format:'philosophy-pocket-library',version:1,articles:{}});
@@ -16,6 +16,7 @@ const server=http.createServer((req,res)=>{
 });
 async function mocks(page,requests){await page.route('https://**/*',async route=>{
  const url=new URL(route.request().url());requests.push(url.href);
+ if(url.pathname.endsWith('.pdf')){await route.fulfill({status:200,contentType:'application/pdf',headers:{'Access-Control-Allow-Origin':'*'},body:'%PDF-1.4\nSynthetic PDF download fixture\n%%EOF'});return;}
  if(url.hostname==='i0.wp.com'){await route.fulfill({status:200,contentType:'image/png',headers:{'Access-Control-Allow-Origin':'*'},body:Buffer.from(png,'base64')});return;}
  const match=url.pathname.match(/\/posts\/(\d+)$/);
  let data;if(url.pathname.endsWith('/pages'))data=[directory];else if(match)data=posts.find(p=>p.id===Number(match[1]));else if(url.pathname.endsWith('/posts'))data=posts.map(({content,...p})=>p);else throw new Error('Unexpected request '+url);
@@ -45,6 +46,14 @@ async function clickDownload(page){await page.locator('#download').click();await
   await page.evaluate(()=>{window.testStore=new Map();});await page.locator('#chooseFolder').click();await clickDownload(page);assert.equal((await page.evaluate(()=>Array.from(testStore.keys()))).filter(n=>n.endsWith('.epub')&&n!=='All Papers.epub').length,3,'An empty directory downloads the full discovered collection');
   await page.screenshot({path:path.join(out,'desktop.png'),fullPage:true});
   const files=await page.evaluate(async()=>{const out=[];for(const [name,blob] of testStore)out.push({name,data:Array.from(new Uint8Array(await blob.arrayBuffer()))});return out;});for(const f of files){fs.mkdirSync(path.dirname(path.join(out,f.name)),{recursive:true});fs.writeFileSync(path.join(out,f.name),Buffer.from(f.data));}
+  // Format switching preserves EPUB history and downloads PDFs independently.
+  await page.locator('#pdfFormat').check();await clickDownload(page);
+  let pdfState=await page.evaluate(async()=>({names:[...testStore.keys()],ledger:JSON.parse(await testStore.get('app-data/philosophy-library.txt').text()),pdf:await testStore.get('papers/Synthetic essay 1.pdf').text()}));
+  assert.equal(pdfState.names.filter(n=>n.endsWith('.pdf')).length,3);assert(pdfState.pdf.startsWith('%PDF-'));
+  assert.equal(Object.keys(pdfState.ledger.articles).length,3);assert.equal(Object.keys(pdfState.ledger.pdfArticles).length,3);
+  const pdfBefore=requests.length;await clickDownload(page);assert(!requests.slice(pdfBefore).some(u=>/\/posts\/\d+/.test(u)));
+  assert.equal(await page.evaluate(()=>localStorage.getItem('downloadFormat')),'pdf');
+  await page.locator('#pdfFormat').uncheck();const epubBefore=requests.length;await clickDownload(page);assert(!requests.slice(epubBefore).some(u=>/\/posts\/\d+/.test(u)));
   await page.evaluate(()=>{window.testStore=new Map([['philosophy-library.txt',new Blob(['broken'])]]);});await page.locator('#chooseFolder').click();const beforeBad=requests.length;await clickDownload(page);assert.equal(requests.length,beforeBad,'Corrupt history must stop before any scraping');
   const zipPage=await browser.newPage({viewport:{width:520,height:700}}),zipRequests=[];await zipPage.addInitScript(()=>{window.showDirectoryPicker=undefined;});await mocks(zipPage,zipRequests);await zipPage.goto(url);
   const imported=path.join(out,'imported');fs.mkdirSync(imported,{recursive:true});fs.mkdirSync(path.join(imported,'app-data'),{recursive:true});fs.writeFileSync(path.join(imported,'app-data','philosophy-library.txt'),JSON.stringify(ledger));
@@ -89,6 +98,9 @@ async function clickDownload(page){await page.locator('#download').click();await
     const history=Philosophy.readLedger('');history.articles['old-sample-2']={file:'legacy.epub'};
     return {alias:Philosophy.isSaved(history,item,[]),legacy:Philosophy.isSaved(Philosophy.readLedger(''),item,['2026-10-02 - sample-2.epub']),filename:Philosophy.filename({title:'A: B? / C',url:item.url}),record:Philosophy.libraryFilename(history,item,[])};
   });assert.deepEqual(compatibility,{alias:true,legacy:true,filename:'A — B C.epub',record:'legacy.epub'});
+  const pdfErrors=await regression.evaluate(()=>{
+    try{Philosophy.pdfURL('<div class="entry-content"><a href="https://evil.example/test.pdf">PDF</a></div>',Philosophy.SITE);return false;}catch(e){return /No downloadable PDF/.test(e.message);}
+  });assert(pdfErrors,'Missing or unsupported PDF links must report an error');
   const sizes=await regression.evaluate(async()=>{
     async function test(width,height,type){const canvas=document.createElement('canvas');canvas.width=width;canvas.height=height;const context=canvas.getContext('2d');context.fillStyle='#333';context.fillRect(0,0,width,height);const raw=atob(canvas.toDataURL(type).split(',')[1]);const result=await Philosophy.readingImage(Uint8Array.from(raw,c=>c.charCodeAt(0)));return {width:result.width,height:result.height,type:result.type};}
     return [await test(3200,2000,'image/jpeg'),await test(1200,3000,'image/png'),await test(320,240,'image/png'),await test(2400,1200,'image/webp')];

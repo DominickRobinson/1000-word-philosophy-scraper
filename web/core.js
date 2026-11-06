@@ -18,11 +18,11 @@
   function key(url) { return new URL(normalize(url)).pathname.split('/').filter(Boolean).pop() || 'home'; }
   function dateOf(url) { const m = url.match(/\/(\d{4}\/\d{2}\/\d{2})\//); return m ? m[1].replace(/\//g, '-') : ''; }
   function legacyFilename(article,id) { return (article.date ? article.date + ' - ' : '') + (id||key(article.url)).replace(/[^a-zA-Z0-9_-]/g, '-').slice(0,140) + '.epub'; }
-  function filename(article) {
+  function filename(article,format) {
     let name=(article.title||key(article.url)).normalize('NFC').replace(/:/g,' —').replace(/[<>"/\\|?*\x00-\x1f]/g,'').replace(/\s+/g,' ').replace(/^[. ]+|[. ]+$/g,'')||'Untitled essay';
     if(/^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/i.test(name))name='_'+name;
     const chars=Array.from(name);while(new TextEncoder().encode(chars.join('')).length>220)chars.pop();
-    return chars.join('').replace(/[. ]+$/g,'')+'.epub';
+    return chars.join('').replace(/[. ]+$/g,'')+(format==='pdf'?'.pdf':'.epub');
   }
   function parse(source) { return new DOMParser().parseFromString(source, 'text/html'); }
   function content(doc) { const el = doc.querySelector('.entry-content'); if (!el) throw new Error('Article content was not found. The website may have changed.'); return el; }
@@ -180,6 +180,15 @@
     });
     return {title:title,author:author,url:canonicalURL,date:dateOf(canonicalURL),root:root,headings:headings,warnings:warnings,stats:stats};
   }
+  function pdfURL(source,url){
+    const root=content(parse(source));
+    const candidates=Array.from(root.querySelectorAll('a[href]')).map(a=>{
+      try{return {url:new URL(a.getAttribute('href'),url),label:text(a)};}catch(_){return null;}
+    }).filter(a=>a&&a.url.protocol==='https:'&&/\.pdf$/i.test(a.url.pathname)&&['1000wordphilosophy.com','www.1000wordphilosophy.com','1000wordphilosophy.files.wordpress.com'].includes(a.url.hostname));
+    candidates.sort((a,b)=>Number(/download|this essay|pdf/i.test(b.label))-Number(/download|this essay|pdf/i.test(a.label)));
+    if(!candidates.length)throw new Error('No downloadable PDF is linked by this essay. Try EPUB instead.');
+    return candidates[0].url.href;
+  }
   function repairNotes(root,warnings,url) {
     const doc=root.ownerDocument, notes=new Map(), refs=new Map();
     let inNotes=false, current=null;
@@ -317,7 +326,8 @@
     const body='<h1>'+escape(article.title)+'</h1>'+(article.author?'<p class="byline">By '+escape(article.author)+'</p>':'')+serialize(article.root)+'<p class="source">Original essay: <a href="'+escape(article.url)+'">1000-Word Philosophy</a>.</p>';
     return packageBook(article.title,[{file:'essay.xhtml',title:article.title,headings:article.headings,body:body}],assets,article.author,key(article.url));
   }
-  function libraryFilename(ledger,article,files){
+  function libraryFilename(ledger,article,files,format){
+    if(format==='pdf'){for(const id of identities(article)){const record=ledger.pdfArticles&&ledger.pdfArticles[id];if(record&&typeof record.file==='string'&&!/[\\/\x00-\x1f]/.test(record.file)&&record.file.endsWith('.pdf'))return record.file;}return filename(article,format);}
     for(const id of identities(article)){
       const record=ledger&&ledger.articles&&ledger.articles[id];
       if(record&&typeof record.file==='string'&&!/[\\/\x00-\x1f]/.test(record.file)&&record.file.endsWith('.epub'))return record.file;
@@ -347,7 +357,7 @@
       }
       const article=byId.get(key(href));if(article){const span=doc.createElement('span');span.innerHTML=links(article,text(a));a.replaceWith(...Array.from(span.childNodes));}
     });
-    const note='Article titles open the original website. Downloaded EPUBs use article titles as filenames.';
+    const note='Article titles open the original website. Downloaded essays use article titles as filenames.';
     const category='<h1 id="by-category">By Category</h1><p>'+note+'</p>'+serialize(root);
     const years=[];let dateBody='<h1 id="by-date">By Date</h1>',year=null;
     articles.slice().sort((a,b)=>b.date.localeCompare(a.date)||a.title.localeCompare(b.title)).forEach(article=>{
@@ -362,11 +372,12 @@
     if(!raw)return{format:'philosophy-pocket-library',version:1,articles:{}};
     let value;try{value=JSON.parse(raw);}catch(_){throw new Error('philosophy-library.txt is not valid. Restore it from your sync backup before scraping.');}
     if(value.format!=='philosophy-pocket-library'||value.version!==1||!value.articles||typeof value.articles!=='object'||Array.isArray(value.articles))throw new Error('Unrecognized download history. It has been left untouched.');
+    if(value.pdfArticles&&(typeof value.pdfArticles!=='object'||Array.isArray(value.pdfArticles)))throw new Error('Unrecognized PDF download history. It has been left untouched.');
     if(value.unavailable&&(typeof value.unavailable!=='object'||Array.isArray(value.unavailable)))throw new Error('Unrecognized unavailable-essay history. It has been left untouched.');
     return value;
   }
   function identities(article){return Array.from(new Set([article.id||key(article.url)].concat(article.aliases||[])));}
-  function isSaved(ledger,article,files){return identities(article).some(id=>!!ledger.articles[id]||(files||[]).includes(legacyFilename(article,id)))||(files||[]).includes(filename(article));}
+  function isSaved(ledger,article,files,format){if(format==='pdf')return identities(article).some(id=>!!(ledger.pdfArticles&&ledger.pdfArticles[id]))||(files||[]).includes(filename(article,format));return identities(article).some(id=>!!ledger.articles[id]||(files||[]).includes(legacyFilename(article,id)))||(files||[]).includes(filename(article));}
   function isUnavailable(ledger,article){return !!article.modified&&identities(article).some(id=>ledger.unavailable&&ledger.unavailable[id]&&ledger.unavailable[id].modified===article.modified);}
-  global.Philosophy={SITE: SITE,normalize:normalize,key:key,filename:filename,discover:discover,extract:extract,articleBook:articleBook,directoryBook:directoryBook,readingImage:readingImage,libraryFilename:libraryFilename,readLedger:readLedger,isSaved:isSaved,isUnavailable:isUnavailable,serialize:serialize,zip:zip,zipBlob:zipBlob};
+  global.Philosophy={SITE: SITE,pdfURL:pdfURL,normalize:normalize,key:key,filename:filename,discover:discover,extract:extract,articleBook:articleBook,directoryBook:directoryBook,readingImage:readingImage,libraryFilename:libraryFilename,readLedger:readLedger,isSaved:isSaved,isUnavailable:isUnavailable,serialize:serialize,zip:zip,zipBlob:zipBlob};
 })(window);
