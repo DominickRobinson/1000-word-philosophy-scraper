@@ -4,7 +4,7 @@ A small, e-ink-friendly tool with two buttons: **Choose folder** and **Download 
 
 **[Open the web app](https://dominickrobinson.github.io/1000-word-philosophy-scraper/)** · **[Download Android](https://github.com/DominickRobinson/1000-word-philosophy-scraper/releases/latest)**
 
-The app reads the All Essays directory and public WordPress metadata to resolve outdated links and include newly published essays. It saves an EPUB for each essay from [1000-Word Philosophy](https://1000wordphilosophy.com/). It includes images, headings, the main text, notes, references, further reading and appendices. In-text citation markers link to their notes; mathematical superscripts and subscripts are retained. Every EPUB has a table of contents. Website menus, related-essay recommendations, subscription forms and author biographies are removed.
+The app reads the All Essays directory and public WordPress metadata to resolve outdated links and include newly published essays. It saves an EPUB for each essay from [1000-Word Philosophy](https://1000wordphilosophy.com/). It includes images, headings, the main text, notes, references, further reading and appendices. In-text citation markers use explicit in-book file paths to jump to their notes on Supernote; mathematical superscripts and subscripts are retained. Every EPUB has a table of contents. Website menus, related-essay recommendations, subscription forms and author biographies are removed.
 
 ## Use
 
@@ -110,3 +110,5 @@ The runtime has no third-party libraries. Playwright is a development-only test 
 [RSS feed](https://1000wordphilosophy.com/feed/) · [All Essays directory](https://1000wordphilosophy.com/all-essays/)
 
 Original essay attribution is retained in each EPUB. The articles remain copyrighted by their respective rights holders. This repository contains the converter, not a redistributed anthology.
+
+The footnote navigation fix in v1.1.6 applies to newly generated EPUBs. A corrected sample was confirmed working in the built-in reader on a Supernote Nomad. Existing library EPUBs are not rewritten automatically.

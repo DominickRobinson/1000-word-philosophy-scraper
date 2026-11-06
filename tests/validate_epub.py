@@ -28,7 +28,10 @@ for file in files:
             continue
         assert any(n.endswith('.png') for n in z.namelist()),'Images must be embedded'
         main=docs['EPUB/essay.xhtml']
-        assert len([e for e in main.iter() if e.get('role')=='doc-noteref'])==2
+        refs=[e for e in main.iter() if e.get('role')=='doc-noteref']
+        assert len(refs)==2
+        assert all(e.get('href','').startswith('essay.xhtml#note-') for e in refs), 'Use explicit in-book paths for Supernote'
+        assert not any(e.get('href','').startswith('#') for e in main.iter()), 'Avoid fragment-only links in packaged chapters'
         assert len([e for e in main.iter() if e.get('role')=='doc-backlink'])==0
 with zipfile.ZipFile(folder/'portable-library.zip') as z:
     ledger=json.loads(z.read('app-data/philosophy-library.txt'))
